@@ -9,6 +9,7 @@ import {
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import LoginScreen from "../screens/LoginScreen";
 
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
@@ -27,53 +28,6 @@ const LoadingScreen = () => (
 );
 
 // شاشة تسجيل الدخول الافتراضية
-const MockLoginScreen = ({ navigation }) => {
-  const { login } = useContext(AuthContext);
-  const [errorMsg, setErrorMsg] = React.useState("");
-
-  const handleTestLogin = async (role) => {
-    // محاكاة تسجيل الدخول بالحسابات التي اختبرناها بالباكيند حياً!
-    const username = role === "ADMIN" ? "thaer" : "user_0992247053";
-    const password = role === "ADMIN" ? "thaer" : "dhkUaOL9";
-
-    const result = await login(username, password);
-    if (result.status === "error") {
-      setErrorMsg(result.message);
-    }
-  };
-
-  return (
-    <View
-      style={[
-        styles.center,
-        { backgroundColor: theme.colors.background, padding: theme.spacing.lg },
-      ]}
-    >
-      <Text style={[styles.mainTitle, { color: theme.colors.primary }]}>
-        تطبيق BillCut الذكي
-      </Text>
-      <Text style={styles.subtitle}>
-        المنصة الذكية للتنبؤ بالفواتير وكشف الخلل
-      </Text>
-
-      {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-
-      <View style={styles.buttonContainer}>
-        <Button
-          title="دخول تجريبي كـ (مستهلك منزلي)"
-          color={theme.colors.secondary}
-          onPress={() => handleTestLogin("RESIDENT")}
-        />
-        <View style={{ height: theme.spacing.md }} />
-        <Button
-          title="دخول تجريبي كـ (مدير النظام - أدمن)"
-          color={theme.colors.primary}
-          onPress={() => handleTestLogin("ADMIN")}
-        />
-      </View>
-    </View>
-  );
-};
 
 // شاشات المشترك العادي (Resident Screens)
 const MockDashboard = () => {
@@ -147,7 +101,7 @@ const Tab = createBottomTabNavigator();
 // 1. مسار المصادقة والدخول العام (Auth Stack)
 const AuthNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
-    <Stack.Screen name="Login" component={MockLoginScreen} />
+    <Stack.Screen name="Login" component={LoginScreen} />
   </Stack.Navigator>
 );
 
