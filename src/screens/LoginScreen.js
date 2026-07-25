@@ -1,50 +1,34 @@
-import React, { useState, useContext } from "react";
+import React from "react";
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 
-// استيراد الأمان والهوية البصرية
-import { AuthContext } from "../context/AuthContext";
+// استيراد المكونات المشتركة التي برمجناها (DTOs & Reusable Elements)
+import CustomInput from "../components/CustomInput";
+import CustomButton from "../components/CustomButton";
+import ErrorAlert from "../components/ErrorAlert";
+
+// استيراد الـ Custom Hook المخصص والمحتضن لكامل منطق العمل والـ States
+import { useLoginForm } from "../hooks/useLoginForm";
 import { theme } from "../theme/theme";
 
 export default function LoginScreen() {
-  const { login } = useContext(AuthContext);
-
-  // تعريف الحالات المحلية لإدارة حقول الإدخال والتحميل والأخطاء
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const handleLogin = async () => {
-    // 1. التحقق المحلي الأولي قبل إرهاق السيرفر بالطلبات الخاطئة
-    if (!username.trim() || !password.trim()) {
-      setErrorMsg("يرجى كتابة اسم المستخدم وكلمة المرور بالكامل.");
-      return;
-    }
-
-    setErrorMsg("");
-    setIsLoading(true);
-
-    // 2. إرسال الطلب واستدعاء خدمة المصادقة الـ JWT
-    const result = await login(username.trim(), password.trim());
-
-    if (result.status === "error") {
-      setErrorMsg(result.message);
-      setIsLoading(false);
-    }
-    // في حال النجاح، سيقوم الـ AppNavigator تلقائياً بالتحويل للمسار الصحيح بفضل الـ Auth Guard
-  };
+  // تفكيك واستدعاء الحالات والوظائف من الـ Hook ب سطر واحد ومثالي (SRP)
+  const {
+    username,
+    setUsername,
+    password,
+    setPassword,
+    isLoading,
+    errorMsg,
+    handleLogin,
+  } = useLoginForm();
 
   return (
-    // استخدام كيبورد متجنب للاصطدام لحماية الواجهة في شاشات الموبايل الصغيرة
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
@@ -55,62 +39,33 @@ export default function LoginScreen() {
           إدارة الطاقة والتنبؤ بالفواتير وكشف الخلل
         </Text>
 
-        {/* عرض رسالة الخطأ التفاعلية باللون المعتمد بالثيم */}
-        {errorMsg ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorMsg}</Text>
-          </View>
-        ) : null}
+        {/* عرض صندوق الخطأ التفاعلي المشترك */}
+        <ErrorAlert message={errorMsg} />
 
-        {/* حقل اسم المستخدم */}
-        <Text style={styles.label}>اسم الحساب</Text>
-        <TextInput
-          style={styles.input}
+        {/* حقل إدخال اسم المستخدم المشترك */}
+        <CustomInput
+          label="اسم الحساب"
           placeholder="أدخل اسم المستخدم أو رقم الهاتف"
-          placeholderTextColor={theme.colors.subtext}
           value={username}
-          onChangeText={(text) => {
-            setUsername(text);
-            setErrorMsg("");
-          }}
-          autoCapitalize="none"
-          keyboardType="default"
+          onChangeText={setUsername}
         />
 
-        {/* حقل كلمة المرور */}
-        <Text style={styles.label}>كلمة المرور</Text>
-        <TextInput
-          style={styles.input}
+        {/* حقل إدخال كلمة المرور المشترك المشفر */}
+        <CustomInput
+          label="كلمة المرور"
           placeholder="أدخل كلمة المرور الخاصة بك"
-          placeholderTextColor={theme.colors.subtext}
           value={password}
-          onChangeText={(text) => {
-            setPassword(text);
-            setErrorMsg("");
-          }}
-          secureTextEntry={true} // حماية تشفير إدخال كلمة المرور بصرياً
-          autoCapitalize="none"
+          onChangeText={setPassword}
+          secureTextEntry={true}
         />
 
-        {/* زر الدخول التفاعلي */}
-        <TouchableOpacity
-          style={[
-            styles.button,
-            {
-              backgroundColor: isLoading
-                ? theme.colors.subtext
-                : theme.colors.primary,
-            },
-          ]}
+        {/* زر الدخول المشترك التفاعلي */}
+        <CustomButton
+          title="تسجيل الدخول الآمن"
           onPress={handleLogin}
-          disabled={isLoading} // تعطيل الزر أثناء التحميل لمنع تكرار النقرات
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>تسجيل الدخول الآمن</Text>
-          )}
-        </TouchableOpacity>
+          isLoading={isLoading}
+          color={theme.colors.primary}
+        />
       </View>
     </KeyboardAvoidingView>
   );
@@ -146,52 +101,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.lg,
     fontWeight: "500",
-  },
-  errorContainer: {
-    backgroundColor: theme.colors.error,
-    padding: theme.spacing.sm,
-    borderRadius: 8,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.errorText,
-  },
-  errorText: {
-    color: theme.colors.errorText,
-    fontSize: 13,
-    textAlign: "center",
-    fontWeight: "600",
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: theme.colors.text,
-    marginBottom: theme.spacing.xs,
-    alignSelf: "flex-start",
-  },
-  input: {
-    width: "100%",
-    height: 48,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: theme.spacing.sm,
-    marginBottom: theme.spacing.md,
-    fontSize: 14,
-    color: theme.colors.text,
-    backgroundColor: "#FAFAFA",
-    textAlign: "right", // مواءمة الكتابة باللغة العربية
-  },
-  button: {
-    width: "100%",
-    height: 48,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: theme.spacing.sm,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "bold",
   },
 });
