@@ -5,7 +5,7 @@ import axios from "axios";
 export const AuthContext = createContext();
 
 //   : استبدل الرابط بـ IP حاسبك المحلي عند تجربة التطبيق على هاتف حقيقي متصل بنفس الشبكة
-export const BASE_URL = "http://127.0.0.1:8000";
+export const BASE_URL = "http://10.0.2.2:8000";
 
 export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
