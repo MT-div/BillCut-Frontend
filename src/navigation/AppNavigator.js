@@ -12,7 +12,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import LoginScreen from "../screens/LoginScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
-
+// أضف استيراد شاشة الإشعارات الحقيقية في أعلى ملف AppNavigator.js
+import NotificationScreen from "../screens/NotificationScreen";
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
@@ -33,16 +34,6 @@ const LoadingScreen = () => (
 
 // شاشات المشترك العادي (Resident Screens)
 
-const MockAnalytics = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>شاشة التحليلات والتنبؤ الذكي الموحدة</Text>
-  </View>
-);
-const MockNotifications = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>مركز الإشعارات وأرشيف التنبيهات</Text>
-  </View>
-);
 const MockSettings = () => (
   <View style={styles.center}>
     <Text style={styles.title}>إعدادات الحساب وتفضيلات التنبيهات</Text>
@@ -122,7 +113,7 @@ const ResidentTabNavigator = () => (
     />
     <Tab.Screen
       name="الإشعارات"
-      component={MockNotifications}
+      component={NotificationScreen}
       options={{ title: "مركز التنبيهات" }}
     />
     <Tab.Screen
