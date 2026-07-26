@@ -15,12 +15,20 @@ import { useNotifications } from "../hooks/useNotifications";
 import { theme } from "../theme/theme";
 
 export default function NotificationScreen() {
-  const { notifications, isLoading, isRefreshing, error, onRefresh, meterId } =
-    useNotifications();
+  const {
+    notifications,
+    isLoading,
+    isRefreshing,
+    isLoadingMore,
+    error,
+    onRefresh,
+    loadMore,
+    hasMore,
+    meterId,
+  } = useNotifications();
 
-  // تنسيق وعرض الكارت الفردي للإشعار التراكمي
   const renderNotificationItem = ({ item }) => {
-    // تحديد لون الحافة اليمنى التفاعلي بناءً على نوع وتصنيف التنبيه (أحمر للأعطال، برتقالي للميزانية، وأزرق للدعم)
+    // 1. تحديد ألوان الحواف التفاعلية لليمين حسب نوع الإشعار
     let borderRightColor = theme.colors.primary;
     if (item.type === "ANOMALY") {
       borderRightColor = theme.colors.errorText;
@@ -28,7 +36,12 @@ export default function NotificationScreen() {
       borderRightColor = theme.colors.secondary;
     }
 
-    // تنسيق التاريخ والوقت العربي
+    // 2. تمييز الإشعار غير المقروء عن المقروء بصرياً وبقمة الأناقة
+    const isUnread = !item.isRead;
+    const cardBg = isUnread ? theme.colors.surface : "#F4F6F7"; // خلفية بيضاء لغير المقروء، ورمادية باهتة للمقروء
+    const titleColor = isUnread ? theme.colors.text : theme.colors.subtext;
+    const messageColor = isUnread ? theme.colors.subtext : "#95A5A6";
+
     const formattedDate = new Date(item.timestamp).toLocaleDateString("ar-SY", {
       year: "numeric",
       month: "long",
@@ -38,13 +51,36 @@ export default function NotificationScreen() {
     });
 
     return (
-      <CustomCard style={[styles.notificationCard, { borderRightColor }]}>
+      <CustomCard
+        style={[
+          styles.notificationCard,
+          { borderRightColor, backgroundColor: cardBg }, // # تطبيق الألوان الديناميكية للخلفية والحافة
+        ]}
+      >
         <View style={styles.headerRow}>
-          <Text style={styles.notificationTitle}>{item.title}</Text>
+          {/* حاوية العنوان المجهزة بنقطة غير مقروءة زرقاء تفاعلية عند اليمين */}
+          <View style={styles.titleContainer}>
+            {isUnread && <View style={styles.unreadDot} />}
+            <Text style={[styles.notificationTitle, { color: titleColor }]}>
+              {item.title}
+            </Text>
+          </View>
           <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
-        <Text style={styles.messageText}>{item.message}</Text>
+        <Text style={[styles.messageText, { color: messageColor }]}>
+          {item.message}
+        </Text>
       </CustomCard>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.footerText}>جاري تحميل التنبيهات السابقة...</Text>
+      </View>
     );
   };
 
@@ -71,13 +107,14 @@ export default function NotificationScreen() {
 
   return (
     <View style={styles.container}>
-      {/* عرض خطأ الاتصال إن وجد */}
       <AlertBanner type="error" message={error} />
 
-      {/* استخدام FlatList عالية الأداء لتخديم القوائم التراكمية وسحب التحديث */}
       <FlatList
         data={notifications}
-        keyExtractor={(item) => item.notificationId.toString()}
+        // حل وحزام أمان هندسي لمنع خطأ تكرار الـ Keys نهائياً
+        keyExtractor={(item, index) =>
+          item.notificationId?.toString() || index.toString()
+        }
         renderItem={renderNotificationItem}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -87,6 +124,9 @@ export default function NotificationScreen() {
             colors={[theme.colors.primary]}
           />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.2}
+        ListFooterComponent={renderFooter}
         ListEmptyComponent={
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyText}>سجل التنبيهات فارغ حالياً.</Text>
@@ -144,21 +184,32 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   notificationCard: {
-    borderRightWidth: 5, // # حافة يمنى أنيقة جداً تعطي مظهراً عصرياً وممتازاً للـ RTL
+    borderRightWidth: 5, // # فرض الحافة اليمنى لـ الـ RTL
+    borderLeftWidth: 0, //# تصفير وحظر الحافة اليسرى تماماً لمنع التداخل
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
   headerRow: {
-    flexDirection: "row",
+    flexDirection: "row", // مواءمة التواريخ يميناً ويساراً للعربية
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: theme.spacing.xs,
     width: "100%",
   },
+  titleContainer: {
+    flexDirection: "row", // جعل النقطة تقع يمين العنوان تماماً للعربية
+    alignItems: "center",
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "red", // نقطة حمراء ناصعة وجذابة تدل على الإشعار الجديد غير المقروء
+    marginLeft: 6, //# مسافة مخصصة بجانب النص العربي
+  },
   notificationTitle: {
     fontSize: 14,
     fontWeight: "bold",
-    color: theme.colors.text,
     textAlign: "right",
   },
   dateText: {
@@ -168,9 +219,20 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 12.5,
-    color: theme.colors.subtext,
-    textAlign: "right",
+    textAlign: "left",
     lineHeight: 18,
     marginTop: 2,
+  },
+  footerLoader: {
+    paddingVertical: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+  },
+  footerText: {
+    fontSize: 11,
+    color: theme.colors.subtext,
+    marginTop: 4,
+    fontWeight: "600",
   },
 });
