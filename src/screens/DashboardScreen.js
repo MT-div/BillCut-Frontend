@@ -9,10 +9,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 
+// استيراد المكونات المشتركة
 import CustomCard from "../components/CustomCard";
 import AlertBanner from "../components/AlertBanner";
 import ProgressGauge from "../components/ProgressGauge";
 
+// استيراد الـ Custom Hook وإدارة الجلسات والثيم
 import { useDashboard } from "../hooks/useDashboard";
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
@@ -20,11 +22,11 @@ import { theme } from "../theme/theme";
 export default function DashboardScreen() {
   const { logout, user } = useContext(AuthContext);
 
-  //# قراءة معرف العداد المربوط بالحساب ديناميكياً لمنع جمود الكود
+  // قراءة معرف العداد المربوط بالحساب ديناميكياً بالكامل لمنع جمود الكود
   const meterId = user?.defaultMeterId;
 
   const { data, isLoading, isRefreshing, error, onRefresh } =
-    useDashboard(meterId); //# يمرر المعرف الديناميكي
+    useDashboard(meterId); // يمرر المعرف الديناميكي المعتمد في الـ Token
 
   if (!meterId) {
     return (
@@ -32,6 +34,7 @@ export default function DashboardScreen() {
         <Text style={styles.loadingText}>
           عذراً، لا يوجد عداد نشط مربوط بحسابك حالياً.
         </Text>
+        <View style={{ height: theme.spacing.md }} />
         <Button
           title="تسجيل الخروج الآمن"
           color={theme.colors.errorText}
@@ -52,15 +55,37 @@ export default function DashboardScreen() {
     );
   }
 
-  //# قراءة حد الدعم الممرر ديناميكياً من السيرفر (مثل 300)
-  const supportLimit = data?.supportLimitKWh || 300.0;
-  const showBanner = data?.cycleActualConsumptionKWh >= supportLimit;
+  // 1. قراءة حدود ومستويات الدعم والميزانية والاستهلاك الفعلي من قاعدة البيانات
+  const supportLimit = parseFloat(data?.supportLimitKWh) || 300.0;
+  const budgetLimit = parseFloat(data?.budgetLimitKWh) || 0.0;
+  const actualConsumption = parseFloat(data?.cycleActualConsumptionKWh) || 0.0;
 
-  const bannerMessage = showBanner
+  // 2. تفعيل رايات التحذير الكبرى لأعلى الشاشة لـ (الدعم والميزانية)
+  const showSupportBanner = actualConsumption >= supportLimit;
+  const showBudgetBanner = budgetLimit > 0 && actualConsumption >= budgetLimit;
+
+  const supportBannerMessage = showSupportBanner
     ? `تنبيه: لقد تجاوزت استهلاك الشريحة المدعومة لهذه الدورة (${parseInt(
         supportLimit
       )} ك.و.س)، الاستهلاك الإضافي سيُحتسب بسعر الشريحة العادية.`
     : null;
+
+  const budgetBannerMessage = showBudgetBanner
+    ? "تنبيه: لقد تجاوزت الميزانية المالية المستهدفة والمحددة من قبلك لهذه الدورة الكهربائية."
+    : null;
+
+  // 3. التحقق الرياضي الدقيق لتنشيط رسائل التجاوز الأربعة التكيفية وتنسيقها تحت كعب كل كارت بالملي
+  const isCycleExceeded =
+    actualConsumption > parseFloat(data?.predictedCycleConsumptionKWh);
+  const isTodayExceeded =
+    parseFloat(data?.todayActualKWh) > parseFloat(data?.todayPredictedKWh);
+
+  const isSubTargetExceeded =
+    parseFloat(data?.todayActualKWh) > parseFloat(data?.avgSubTargetKWh) &&
+    parseFloat(data?.avgSubTargetKWh) > 0;
+  const isBudgetTargetExceeded =
+    parseFloat(data?.todayActualKWh) > parseFloat(data?.avgBudgetTargetKWh) &&
+    parseFloat(data?.avgBudgetTargetKWh) > 0;
 
   return (
     <ScrollView
@@ -74,23 +99,46 @@ export default function DashboardScreen() {
         />
       }
     >
-      <AlertBanner type="error" message={bannerMessage || error} />
+      {/* عرض خطأ الاتصال بالسيرفر إن وجد */}
+      <AlertBanner type="error" message={error} />
+
+      {/* عرض لافتة تجاوز الشريحة المدعومة في الأعلى إن تحقق الشرط */}
+      <AlertBanner type="error" message={supportBannerMessage} />
+
+      {/* عرض لافتة تجاوز الميزانية المالية في الأعلى إن تحقق الشرط */}
+      <AlertBanner type="error" message={budgetBannerMessage} />
 
       <CustomCard style={styles.gaugeCard}>
+        {/* تعديل مسمى العنوان ليدل بدقة على القياس التراكمي ومقارنته بالحدود */}
         <Text style={styles.cardTitle}>
-          مؤشر تقدم استهلاك الدورة الكهربائية
+          مؤشر استهلاك الدورة مقارنة بحد الدعم والميزانية
         </Text>
 
-        {/* الدائرة أصبحت صامتة وبدون أي كتابة بداخلها لراحة العين والجمالية */}
-        <ProgressGauge
-          value={data?.cycleActualConsumptionKWh || 0.0}
-          max={supportLimit}
-        />
+        {/* عرض المؤشرات الدائرية الجانبية بجانب بعضها لسهولة المقارنة البصرية */}
+        <View style={styles.gaugesRow}>
+          {/* الدائرة الأولى: الدعم */}
+          <View style={styles.gaugeContainer}>
+            <ProgressGauge value={actualConsumption} max={supportLimit} />
+            <Text style={styles.gaugeLabel}>
+              مؤشر استهلاك الدورة بالنسبة لحد الدعم
+            </Text>
+          </View>
+          {/* الدائرة الثانية: الميزانية */}
+          <View style={styles.gaugeContainer}>
+            <ProgressGauge
+              value={actualConsumption}
+              max={budgetLimit > 0 ? budgetLimit : 1.0}
+            />
+            <Text style={styles.gaugeLabel}>
+              مؤشر استهلاك الدورة بالنسبة للميزانية
+            </Text>
+          </View>
+        </View>
 
         {/* عرض الأرقام خارج الدائرة بكروت منسقة وخالية من الفواصل العشرية */}
         <View style={styles.gaugeStats}>
           <Text style={styles.statsText}>
-            الاستهلاك الحالي: {data?.cycleActualConsumptionKWh} ك.و.س
+            الاستهلاك الفعلي للدورة: {data?.cycleActualConsumptionKWh} ك.و.س
           </Text>
           <Text
             style={[
@@ -98,7 +146,7 @@ export default function DashboardScreen() {
               { color: theme.colors.primary, marginTop: 4 },
             ]}
           >
-            التكلفة الحالية: {data?.accumulatedCostSYP} ل.س
+            التكلفة المالية المتراكمة: {data?.accumulatedCostSYP} ل.س
           </Text>
         </View>
         <Text style={styles.dateRangeText}>
@@ -119,49 +167,110 @@ export default function DashboardScreen() {
         </CustomCard>
       </View>
 
-      <CustomCard>
-        <Text style={styles.cardTitle}>
-          التقديرات المالية بنهاية الدورة (AI)
-        </Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>الفاتورة الإجمالية المتوقعة:</Text>
-          <Text style={styles.infoValue}>{data?.predictedBillSYP} ل.س</Text>
-        </View>
-      </CustomCard>
+      {/* كارت التقديرات المالية والاستهلاكية بنهاية الدورة */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>
+            التقديرات المالية والاستهلاكية بنهاية الدورة (AI)
+          </Text>
+          {/* عرض استهلاك الدورة المتوقع بالكيلوواط فوق الفاتورة المتوقعة */}
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>
+              الاستهلاك الإجمالي المتوقع للدورة:
+            </Text>
+            <Text style={styles.infoValue}>
+              {data?.predictedCycleConsumptionKWh} ك.و.س
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>
+              الفاتورة المالية الإجمالية المتوقعة:
+            </Text>
+            <Text style={styles.infoValue}>{data?.predictedBillSYP} ل.س</Text>
+          </View>
+        </CustomCard>
+        {/* التحذير 1: لقد تجاوزت الاستهلاك المتوقع لهذه الدورة */}
+        {isCycleExceeded && (
+          <Text style={styles.alertUnderCard}>
+            ⚠️ لقد تجاوزت الاستهلاك المتوقع لهذه الدورة الكهربائية.
+          </Text>
+        )}
+      </View>
 
-      <CustomCard>
-        <Text style={styles.cardTitle}>مراقبة استهلاك اليوم الحالي</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>الاستهلاك الفعلي حتى اللحظة:</Text>
-          <Text style={[styles.infoValue, { color: theme.colors.primary }]}>
-            {data?.todayActualKWh} ك.و.س
+      {/* كارت استهلاك اليوم الحالي */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>مراقبة استهلاك اليوم الحالي</Text>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>الاستهلاك الفعلي حتى اللحظة:</Text>
+            <Text style={[styles.infoValue, { color: theme.colors.primary }]}>
+              {data?.todayActualKWh} ك.و.س
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            {/* تعديل المسمى ليكون الاستهلاك المتوقع لليوم */}
+            <Text style={styles.infoLabel}>الاستهلاك المتوقع لليوم:</Text>
+            <Text style={styles.infoValue}>
+              {data?.todayPredictedKWh} ك.و.س
+            </Text>
+          </View>
+        </CustomCard>
+        {/* التحذير 2: لقد تجاوزت الاستهلاك المتوقع لليوم */}
+        {isTodayExceeded && (
+          <Text style={styles.alertUnderCard}>
+            ⚠️ لقد تجاوزت الاستهلاك المتوقع المخطط له لليوم الحالي.
           </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>الاستهلاك اليومي المتوقع للغد:</Text>
-          <Text style={styles.infoValue}>{data?.todayPredictedKWh} ك.و.س</Text>
-        </View>
-      </CustomCard>
+        )}
+      </View>
 
-      <CustomCard>
-        <Text style={styles.cardTitle}>
-          الحدود اليومية المتاحة للأيام المتبقية
-        </Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>المعدل اليومي للبقاء في الدعم:</Text>
-          <Text style={[styles.infoValue, { color: theme.colors.successText }]}>
-            {data?.avgSubTargetKWh} ك.و.س
+      {/* كارت الحدود الاستهلاكية اليومية المستهدفة لليوم الحالي */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>
+            الحدود اليومية المتاحة للأيام المتبقية
           </Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>
-            المعدل اليومي للبقاء في الميزانية:
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>المعدل اليومي للبقاء في الدعم:</Text>
+            <Text
+              style={[styles.infoValue, { color: theme.colors.successText }]}
+            >
+              {data?.avgSubTargetKWh} ك.و.س
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>
+              المعدل اليومي للبقاء في الميزانية:
+            </Text>
+            <Text style={[styles.infoValue, { color: theme.colors.secondary }]}>
+              {data?.avgBudgetTargetKWh} ك.و.س
+            </Text>
+          </View>
+        </CustomCard>
+
+        {/* التحذير 3: لقد تجاوزت المعدل اليومي للبقاء في الدعم */}
+        {isSubTargetExceeded && (
+          <Text style={styles.alertUnderCard}>
+            ⚠️ لقد تجاوزت المعدل اليومي الموصى به للبقاء في الدعم، سوف يتم حساب
+            المعدل الجديد في نهاية اليوم عند منتصف الليل.
           </Text>
-          <Text style={[styles.infoValue, { color: theme.colors.secondary }]}>
-            {data?.avgBudgetTargetKWh} ك.و.س
+        )}
+
+        {/* التحذير 4: لقد تجاوزت المعدل اليومي للبقاء في الميزانية */}
+        {isBudgetTargetExceeded && (
+          <Text
+            style={[
+              styles.alertUnderCard,
+              {
+                color: theme.colors.secondary,
+                borderColor: theme.colors.secondary,
+              },
+            ]}
+          >
+            ⚠️ لقد تجاوزت المعدل اليومي الموصى به للبقاء ضمن ميزانيتك الشخصية،
+            سوف يتم حساب المعدل الجديد في نهاية اليوم عند منتصف الليل.
           </Text>
-        </View>
-      </CustomCard>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -173,6 +282,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
   },
   loadingCenter: {
     flex: 1,
@@ -192,17 +302,37 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "bold",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
-    alignSelf: "flex-start",
+    alignSelf: "center", // لتوسيط العنوان مع الدائرتين
+    textAlign: "center",
   },
   smallCardTitle: {
     fontSize: 12,
     color: theme.colors.subtext,
     fontWeight: "bold",
     marginBottom: theme.spacing.xs,
+  },
+  gaugesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: theme.spacing.xs,
+    marginVertical: theme.spacing.sm,
+  },
+  gaugeContainer: {
+    alignItems: "center",
+    width: "48%",
+  },
+  gaugeLabel: {
+    fontSize: 10,
+    color: theme.colors.subtext,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: theme.spacing.xs,
+    lineHeight: 14,
   },
   gaugeStats: {
     alignItems: "center",
@@ -234,7 +364,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   infoRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
     paddingVertical: theme.spacing.xs,
@@ -248,5 +378,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: theme.colors.text,
+  },
+  sectionContainer: {
+    marginBottom: theme.spacing.md,
+    width: "100%",
+  },
+  cardNoMargin: {
+    marginBottom: 0,
+  },
+  alertUnderCard: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: theme.colors.errorText,
+    backgroundColor: "#FFF2F2",
+    padding: theme.spacing.sm,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: theme.colors.errorText,
+    lineHeight: 16,
   },
 });
