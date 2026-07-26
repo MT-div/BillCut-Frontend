@@ -10,6 +10,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import LoginScreen from "../screens/LoginScreen";
+import DashboardScreen from "../screens/DashboardScreen";
 
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
@@ -30,20 +31,6 @@ const LoadingScreen = () => (
 // شاشة تسجيل الدخول الافتراضية
 
 // شاشات المشترك العادي (Resident Screens)
-const MockDashboard = () => {
-  const { logout, user } = useContext(AuthContext);
-  return (
-    <View style={styles.center}>
-      <Text style={styles.title}>شاشة لوحة المراقبة التفاعلية (Dashboard)</Text>
-      <Text style={styles.userText}>مرحباً بك: {user?.fullName} (مستهلك)</Text>
-      <Button
-        title="تسجيل الخروج الآمن"
-        color={theme.colors.errorText}
-        onPress={logout}
-      />
-    </View>
-  );
-};
 
 const MockAnalytics = () => (
   <View style={styles.center}>
@@ -106,6 +93,7 @@ const AuthNavigator = () => (
 );
 
 // 2. مسار المستهلك المنزلي الموزع سفلياً (Resident Bottom Tab)
+
 const ResidentTabNavigator = () => (
   <Tab.Navigator
     screenOptions={{
@@ -123,7 +111,7 @@ const ResidentTabNavigator = () => (
   >
     <Tab.Screen
       name="لوحة المراقبة"
-      component={MockDashboard}
+      component={DashboardScreen}
       options={{ title: "لوحة المراقبة" }}
     />
     <Tab.Screen
