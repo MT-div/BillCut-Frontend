@@ -11,6 +11,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import LoginScreen from "../screens/LoginScreen";
 import DashboardScreen from "../screens/DashboardScreen";
+import AnalyticsScreen from "../screens/AnalyticsScreen";
 
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
@@ -116,7 +117,7 @@ const ResidentTabNavigator = () => (
     />
     <Tab.Screen
       name="التحليلات"
-      component={MockAnalytics}
+      component={AnalyticsScreen}
       options={{ title: "التحليلات الذكية" }}
     />
     <Tab.Screen
