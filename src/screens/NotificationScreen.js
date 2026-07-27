@@ -24,11 +24,10 @@ export default function NotificationScreen() {
     onRefresh,
     loadMore,
     hasMore,
-    meterId,
+    userId, // # تحديث ليعتمد على الـ userId
   } = useNotifications();
 
   const renderNotificationItem = ({ item }) => {
-    // 1. تحديد ألوان الحواف التفاعلية لليمين حسب نوع الإشعار
     let borderRightColor = theme.colors.primary;
     if (item.type === "ANOMALY") {
       borderRightColor = theme.colors.errorText;
@@ -36,9 +35,8 @@ export default function NotificationScreen() {
       borderRightColor = theme.colors.secondary;
     }
 
-    // 2. تمييز الإشعار غير المقروء عن المقروء بصرياً وبقمة الأناقة
     const isUnread = !item.isRead;
-    const cardBg = isUnread ? theme.colors.surface : "#F4F6F7"; // خلفية بيضاء لغير المقروء، ورمادية باهتة للمقروء
+    const cardBg = isUnread ? theme.colors.surface : "#F4F6F7";
     const titleColor = isUnread ? theme.colors.text : theme.colors.subtext;
     const messageColor = isUnread ? theme.colors.subtext : "#95A5A6";
 
@@ -54,11 +52,10 @@ export default function NotificationScreen() {
       <CustomCard
         style={[
           styles.notificationCard,
-          { borderRightColor, backgroundColor: cardBg }, // # تطبيق الألوان الديناميكية للخلفية والحافة
+          { borderRightColor, backgroundColor: cardBg },
         ]}
       >
         <View style={styles.headerRow}>
-          {/* حاوية العنوان المجهزة بنقطة غير مقروءة زرقاء تفاعلية عند اليمين */}
           <View style={styles.titleContainer}>
             {isUnread && <View style={styles.unreadDot} />}
             <Text style={[styles.notificationTitle, { color: titleColor }]}>
@@ -67,6 +64,12 @@ export default function NotificationScreen() {
           </View>
           <Text style={styles.dateText}>{formattedDate}</Text>
         </View>
+
+        {/* عرض شارة / بادج اسم العداد المنسقة لليمين تماشياً مع الـ RTL والمزامنة */}
+        <View style={styles.aliasBadge}>
+          <Text style={styles.aliasBadgeText}>📌 {item.meterAlias}</Text>
+        </View>
+
         <Text style={[styles.messageText, { color: messageColor }]}>
           {item.message}
         </Text>
@@ -84,7 +87,7 @@ export default function NotificationScreen() {
     );
   };
 
-  if (!meterId) {
+  if (!userId) {
     return (
       <View style={styles.loadingCenter}>
         <Text style={styles.loadingText}>
@@ -99,7 +102,7 @@ export default function NotificationScreen() {
       <View style={styles.loadingCenter}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>
-          جاري تحميل أرشيف سجل التنبيهات...
+          جاري تحميل أرشيف سجل التنبيهات الموحد...
         </Text>
       </View>
     );
@@ -111,7 +114,6 @@ export default function NotificationScreen() {
 
       <FlatList
         data={notifications}
-        // حل وحزام أمان هندسي لمنع خطأ تكرار الـ Keys نهائياً
         keyExtractor={(item, index) =>
           item.notificationId?.toString() || index.toString()
         }
@@ -184,33 +186,32 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   notificationCard: {
-    borderRightWidth: 5, // # فرض الحافة اليمنى لـ الـ RTL
-    borderLeftWidth: 0, //# تصفير وحظر الحافة اليسرى تماماً لمنع التداخل
+    borderRightWidth: 5,
+    borderLeftWidth: 0,
     padding: theme.spacing.sm,
     marginBottom: theme.spacing.sm,
   },
   headerRow: {
-    flexDirection: "row", // مواءمة التواريخ يميناً ويساراً للعربية
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: theme.spacing.xs,
     width: "100%",
   },
   titleContainer: {
-    flexDirection: "row", // جعل النقطة تقع يمين العنوان تماماً للعربية
+    flexDirection: "row",
     alignItems: "center",
   },
   unreadDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "red", // نقطة حمراء ناصعة وجذابة تدل على الإشعار الجديد غير المقروء
-    marginLeft: 6, //# مسافة مخصصة بجانب النص العربي
+    backgroundColor: "red",
+    marginLeft: 6,
   },
   notificationTitle: {
     fontSize: 14,
     fontWeight: "bold",
-    textAlign: "right",
   },
   dateText: {
     fontSize: 10,
@@ -219,9 +220,8 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 12.5,
-    textAlign: "left",
     lineHeight: 18,
-    marginTop: 2,
+    marginTop: 4,
   },
   footerLoader: {
     paddingVertical: theme.spacing.sm,
@@ -234,5 +234,21 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     marginTop: 4,
     fontWeight: "600",
+  },
+  // تنسيق شارة اسم العداد المنسقة والمحاذاة لليمين بأناقة
+  aliasBadge: {
+    backgroundColor: "#EBF5FB",
+    alignSelf: "flex-start", // يجعل الشارة تنكمش على مقاس الكلمة وتصطف لليمين
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#AED6F1",
+    marginBottom: theme.spacing.sm,
+  },
+  aliasBadgeText: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: theme.colors.primary,
   },
 });
