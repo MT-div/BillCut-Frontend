@@ -3,57 +3,55 @@ import apiClient from "../api/apiClient";
 import { AuthContext } from "../context/AuthContext";
 
 export function useSettings() {
-  const { user, logout } = useContext(AuthContext);
+  const { user, logout, updateUserData } = useContext(AuthContext);
   const userId = user?.id;
-  const meterId = user?.defaultMeterId;
 
   const [isLoading, setIsLoading] = useState(true);
 
-  // ============================================================
-  // أ. حالات كارت رقم الهاتف (مستقلة تماماً - لها كلمة مرورها الخاصة)
-  // ============================================================
+  // أ. حالات كارت رقم الهاتف
   const [newPhone, setNewPhone] = useState(user?.phoneNumber || "");
   const [phoneCurrentPassword, setPhoneCurrentPassword] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [phoneSuccess, setPhoneSuccess] = useState("");
   const [isPhoneSubmitting, setIsPhoneSubmitting] = useState(false);
 
-  // ============================================================
-  // ب. حالات كارت كلمة المرور (مستقلة تماماً)
-  // ============================================================
+  // ب. حالات كارت كلمة المرور
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  // أخطاء منفصلة لكل حقل بدل رسالة عامة مربوطة بحقل واحد فقط
   const [passwordFieldErrors, setPasswordFieldErrors] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
-  const [passwordError, setPasswordError] = useState(""); // خطأ عام (من السيرفر مثلاً)
+  const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
-  // ============================================================
-  // ج. حالات كارت الميزانية
-  // ============================================================
+  // ج. حالات كارت الميزانية (تحديد العداد الميزانية النشط اختيارياً)
+  const [activeBudgetMeterId, setActiveBudgetMeterId] = useState(
+    user?.defaultMeterId || ""
+  );
   const [targetBudget, setTargetBudget] = useState("");
   const [budgetError, setBudgetError] = useState("");
   const [budgetSuccess, setBudgetSuccess] = useState("");
   const [isBudgetSubmitting, setIsBudgetSubmitting] = useState(false);
 
-  // ============================================================
-  // د. تفضيلات إشعارات الدفع (Toggles) - كائن واحد لتفادي الـ race condition
-  // ============================================================
+  // د. تفضيلات إشعارات الدفع (Toggles)
   const [notificationPrefs, setNotificationPrefs] = useState({
     budgetPush: true,
     tierPush: true,
     anomalyPush: true,
   });
 
+  // هـ. حالات النافذة المنبثقة لتعديل اسم العداد (Modal)
+  const [isRenameModalVisible, setIsRenameModalVisible] = useState(false);
+  const [meterToRename, setMeterToRename] = useState(null);
+  const [newAliasInput, setNewAliasInput] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+
   const fetchUserSettings = useCallback(async () => {
     if (!userId) {
-      // إصلاح: كنا نرجع بدون تصفير isLoading، ما يسبب شاشة تحميل معلقة للأبد
       setIsLoading(false);
       return;
     }
@@ -77,21 +75,13 @@ export function useSettings() {
     }
   }, [userId]);
 
-  // ------------------------------------------------------------
-  // 1. خدمة تعديل رقم الهاتف (endpoint مستقل تماماً)
-  // ------------------------------------------------------------
+  // 1. تعديل الهاتف
   const handleUpdatePhone = async () => {
     setPhoneError("");
     setPhoneSuccess("");
-
-    if (!newPhone.trim()) {
-      setPhoneError("حقل رقم الهاتف مطلوب لتعديله.");
-      return;
-    }
-    if (!phoneCurrentPassword.trim()) {
-      setPhoneError("يرجى إدخال كلمة المرور الحالية لتأكيد التعديل.");
-      return;
-    }
+    if (!newPhone.trim()) return setPhoneError("حقل رقم الهاتف مطلوب.");
+    if (!phoneCurrentPassword.trim())
+      return setPhoneError("يرجى إدخال كلمة المرور لتأكيد التعديل.");
 
     setIsPhoneSubmitting(true);
     try {
@@ -99,28 +89,21 @@ export function useSettings() {
         newPhone: newPhone.trim(),
         currentPassword: phoneCurrentPassword.trim(),
       });
-
       if (response.data.status === "success") {
         setPhoneSuccess("تم تحديث رقم الهاتف ومزامنة حسابك بنجاح.");
         setPhoneCurrentPassword("");
       }
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        "تعذر التعديل، يرجى التحقق من كلمة المرور المدخلة.";
-      setPhoneError(msg);
+      setPhoneError(err.response?.data?.message || "فشل التعديل.");
     } finally {
       setIsPhoneSubmitting(false);
     }
   };
 
-  // ------------------------------------------------------------
-  // 2. خدمة تعديل كلمة المرور (endpoint مستقل تماماً)
-  // ------------------------------------------------------------
+  // 2. تعديل كلمة المرور
   const handleUpdatePassword = async () => {
     setPasswordError("");
     setPasswordSuccess("");
-
     const fieldErrors = {
       currentPassword: "",
       newPassword: "",
@@ -136,15 +119,14 @@ export function useSettings() {
       fieldErrors.newPassword = "هذا الحقل مطلوب.";
       hasError = true;
     } else if (newPassword.trim().length < 8) {
-      fieldErrors.newPassword = "يجب ألا تقل كلمة المرور عن 8 أحرف.";
+      fieldErrors.newPassword = "يجب ألا تقل عن 8 أحرف.";
       hasError = true;
     }
     if (!confirmPassword.trim()) {
       fieldErrors.confirmPassword = "هذا الحقل مطلوب.";
       hasError = true;
     } else if (newPassword !== confirmPassword) {
-      fieldErrors.confirmPassword =
-        "كلمة المرور الجديدة وتأكيدها غير متطابقين.";
+      fieldErrors.confirmPassword = "كلمتا المرور غير متطابقتين.";
       hasError = true;
     }
 
@@ -161,29 +143,24 @@ export function useSettings() {
         newPassword: newPassword.trim(),
         confirmPassword: confirmPassword.trim(),
       });
-
       if (response.data.status === "success") {
-        setPasswordSuccess("تم تعديل وتحديث كلمة المرور بنجاح.");
+        setPasswordSuccess("تم تحديث كلمة المرور بنجاح.");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
       }
     } catch (err) {
-      const msg =
-        err.response?.data?.message ||
-        "تعذر التحديث، يرجى التأكد من كلمة المرور الحالية.";
-      setPasswordError(msg);
+      setPasswordError(err.response?.data?.message || "فشلت العملية.");
     } finally {
       setIsPasswordSubmitting(false);
     }
   };
 
-  // ------------------------------------------------------------
-  // 3. خدمة تعديل ميزانية العداد
-  // ------------------------------------------------------------
+  // 3. تعديل الميزانية لعداد محدد يتم اختياره من الواجهة
   const handleUpdateBudget = async () => {
     setBudgetError("");
     setBudgetSuccess("");
+    if (!activeBudgetMeterId) return setBudgetError("يرجى تحديد العداد أولاً.");
 
     const trimmed = targetBudget.trim();
     if (!trimmed || isNaN(trimmed) || Number(trimmed) <= 0) {
@@ -194,10 +171,11 @@ export function useSettings() {
     setIsBudgetSubmitting(true);
     try {
       const response = await apiClient.post(
-        `/api/meter/${meterId}/budget/set/`,
-        { targetBudgetSYP: parseFloat(trimmed) }
+        `/api/meter/${activeBudgetMeterId}/budget/set/`,
+        {
+          targetBudgetSYP: parseFloat(trimmed),
+        }
       );
-
       if (response.data.status === "success") {
         setBudgetSuccess(
           `تم حفظ ميزانيتك، سقف استهلاكك الجديد هو ${response.data.data.equivalentLimitKWh} ك.و.س.`
@@ -205,22 +183,67 @@ export function useSettings() {
         setTargetBudget("");
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "تعذر حفظ الميزانية.";
-      setBudgetError(msg);
+      setBudgetError(err.response?.data?.message || "تعذر حفظ الميزانية.");
     } finally {
       setIsBudgetSubmitting(false);
     }
   };
 
-  // ------------------------------------------------------------
-  // 4. تبديل تفضيلات الإشعارات - يعتمد على أحدث state دائماً (functional update)
-  //    هذا يحل مشكلة الـ race condition عند الضغط السريع المتتالي
-  // ------------------------------------------------------------
+  // 4. تعديل الاسم المستعار للعداد (سحابياً وتحديث محلياً بالـ Context)
+  const handleRenameMeter = async () => {
+    if (!newAliasInput.trim() || !meterToRename) return;
+    setIsRenaming(true);
+    try {
+      const response = await apiClient.put(
+        `/api/user/meter/preferences/${meterToRename.preferenceId}/`,
+        {
+          alias: newAliasInput.trim(),
+        }
+      );
+      if (response.data.status === "success") {
+        // تحديث مصفوفة العدادات محلياً فوراً في الهاتف لتعكس التسمية الجديدة
+        const updatedMeters = user.meters.map((m) =>
+          m.meterId === meterToRename.meterId
+            ? { ...m, alias: newAliasInput.trim() }
+            : m
+        );
+        await updateUserData(updatedMeters, null);
+        setIsRenameModalVisible(false);
+        setMeterToRename(null);
+        setNewAliasInput("");
+      }
+    } catch (err) {
+      console.log("تعذر التعديل:", err);
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
+  // 5. تعيين العداد كافتراضي للتطبيق بنقرة واحدة وتحديث محلياً
+  const handleSetDefaultMeter = async (preferenceId, targetMeterId) => {
+    try {
+      const response = await apiClient.put(
+        `/api/user/meter/preferences/${preferenceId}/`,
+        {
+          isDefault: true,
+        }
+      );
+      if (response.data.status === "success") {
+        const updatedMeters = user.meters.map((m) =>
+          m.meterId === targetMeterId
+            ? { ...m, isDefault: true }
+            : { ...m, isDefault: false }
+        );
+        await updateUserData(updatedMeters, targetMeterId); // مزامنة العداد الافتراضي محلياً
+      }
+    } catch (err) {
+      console.log("تعذر تعيين العداد الافتراضي:", err);
+    }
+  };
+
   const handleTogglePreference = (field) => {
     setNotificationPrefs((prev) => {
       const updated = { ...prev, [field]: !prev[field] };
-
-      // إرسال الطلب بالاعتماد على القيم المحدّثة فعلياً (لا نستخدم متغيرات قديمة من الإغلاق)
       apiClient
         .post(`/api/user/${userId}/notification_settings/`, {
           budgetPushEnabled: updated.budgetPush,
@@ -228,13 +251,11 @@ export function useSettings() {
           anomalyPushEnabled: updated.anomalyPush,
         })
         .catch(() => {
-          // إذا فشل الطلب، أعد الحالة لما كانت عليه قبل التبديل
           setNotificationPrefs((current) => ({
             ...current,
             [field]: prev[field],
           }));
         });
-
       return updated;
     });
   };
@@ -245,7 +266,6 @@ export function useSettings() {
 
   return {
     isLoading,
-    // هاتف
     newPhone,
     setNewPhone,
     phoneCurrentPassword,
@@ -254,7 +274,6 @@ export function useSettings() {
     phoneSuccess,
     isPhoneSubmitting,
     handleUpdatePhone,
-    // كلمة مرور
     currentPassword,
     setCurrentPassword,
     newPassword,
@@ -266,17 +285,25 @@ export function useSettings() {
     passwordSuccess,
     isPasswordSubmitting,
     handleUpdatePassword,
-    // ميزانية
+    activeBudgetMeterId,
+    setActiveBudgetMeterId,
     targetBudget,
     setTargetBudget,
     budgetError,
     budgetSuccess,
     isBudgetSubmitting,
     handleUpdateBudget,
-    // إشعارات
+    isRenameModalVisible,
+    setIsRenameModalVisible,
+    meterToRename,
+    setMeterToRename,
+    newAliasInput,
+    setNewAliasInput,
+    isRenaming,
+    handleRenameMeter,
+    handleSetDefaultMeter,
     notificationPrefs,
     handleTogglePreference,
-    // عام
     logout,
     user,
   };

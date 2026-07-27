@@ -6,8 +6,11 @@ import {
   ScrollView,
   Switch,
   ActivityIndicator,
+  TouchableOpacity,
+  Modal,
 } from "react-native";
 
+// استيراد المكونات المحدثة والمشتركة
 import CustomCard from "../components/CustomCard";
 import CustomInput from "../components/CustomInput";
 import CustomButton from "../components/CustomButton";
@@ -41,16 +44,27 @@ export default function SettingsScreen() {
     isPasswordSubmitting,
     handleUpdatePassword,
     // ميزانية
+    activeBudgetMeterId,
+    setActiveBudgetMeterId,
     targetBudget,
     setTargetBudget,
     budgetError,
     budgetSuccess,
     isBudgetSubmitting,
     handleUpdateBudget,
-    // إشعارات
+    // نافذة التسمية (Modal) والافتراضي
+    isRenameModalVisible,
+    setIsRenameModalVisible,
+    meterToRename,
+    setMeterToRename,
+    newAliasInput,
+    setNewAliasInput,
+    isRenaming,
+    handleRenameMeter,
+    handleSetDefaultMeter,
+    // إشعارات وعام
     notificationPrefs,
     handleTogglePreference,
-    // عام
     logout,
     user,
   } = useSettings();
@@ -71,7 +85,7 @@ export default function SettingsScreen() {
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
     >
-      {/* كارت 1: تعديل رقم الهاتف - مستقل تماماً بحقل كلمة مروره الخاص */}
+      {/* كارت 1: إدارة معلومات وتفاصيل الحساب (الهاتف) */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>إدارة معلومات وتفاصيل الحساب</Text>
@@ -85,16 +99,15 @@ export default function SettingsScreen() {
             value={newPhone}
             onChangeText={setNewPhone}
             keyboardType="phone-pad"
+            error={phoneError ? "يرجى التحقق من المدخلات." : null}
           />
-
           <CustomInput
-            label="كلمة المرور الحالية (لتأكيد التعديل)"
+            label="كلمة المرور الحالية (لتأكيد تعديل الهاتف)"
             placeholder="أدخل كلمة مرورك الحالية"
             value={phoneCurrentPassword}
             onChangeText={setPhoneCurrentPassword}
             secureTextEntry
           />
-
           <CustomButton
             title={
               isPhoneSubmitting
@@ -110,20 +123,18 @@ export default function SettingsScreen() {
         <CustomAlert type="success" message={phoneSuccess} />
       </View>
 
-      {/* كارت 2: أمان الحساب وتعديل كلمة المرور - مستقل تماماً */}
+      {/* كارت 2: أمان الحساب وتعديل كلمة المرور (منفصل ومستقل تماماً) */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>أمان الحساب وتغيير كلمة المرور</Text>
-
           <CustomInput
-            label="كلمة المرور الحالية (إلزامية للتأكيد والحفظ)"
+            label="كلمة المرور الحالية (إلزامية للتغيير)"
             placeholder="أدخل كلمة مرورك الحالية"
             value={currentPassword}
             onChangeText={setCurrentPassword}
             secureTextEntry
             error={passwordFieldErrors.currentPassword}
           />
-
           <CustomInput
             label="كلمة المرور الجديدة"
             placeholder="أدخل كلمة المرور الجديدة"
@@ -132,7 +143,6 @@ export default function SettingsScreen() {
             secureTextEntry
             error={passwordFieldErrors.newPassword}
           />
-
           <CustomInput
             label="تأكيد كلمة المرور الجديدة"
             placeholder="أعد إدخال كلمة المرور للتأكيد"
@@ -141,7 +151,6 @@ export default function SettingsScreen() {
             secureTextEntry
             error={passwordFieldErrors.confirmPassword}
           />
-
           <CustomButton
             title={
               isPasswordSubmitting
@@ -153,30 +162,136 @@ export default function SettingsScreen() {
             disabled={isPasswordSubmitting}
           />
         </CustomCard>
-        {/* خطأ عام (من السيرفر) يظهر تحت الكرت، منفصل عن أخطاء الحقول الفردية أعلاه */}
         <CustomAlert type="error" message={passwordError} />
         <CustomAlert type="success" message={passwordSuccess} />
       </View>
 
-      {/* كارت 3: إدارة الميزانية المالية والتعرفة العكسية */}
+      {/* كارت 3: إدارة العدادات الخاصة (Meters Management) */}
+      <View style={styles.sectionContainer}>
+        <CustomCard>
+          <Text style={styles.cardTitle}>
+            حوكمة العدادات الكهربائية الخاصة بك
+          </Text>
+          <Text style={styles.subLabel}>
+            قائمة بجميع عداداتك المسندة إليك؛ يمكنك تعديل الاسم أو تحديد العداد
+            الافتراضي:
+          </Text>
+
+          {user?.meters &&
+            user.meters.map((item) => (
+              <View key={item.meterId} style={styles.meterRow}>
+                <View style={styles.meterInfo}>
+                  <Text style={styles.meterAlias}>
+                    {item.alias}{" "}
+                    {item.isDefault && (
+                      <Text style={{ color: theme.colors.secondary }}>
+                        (الافتراضي)
+                      </Text>
+                    )}
+                  </Text>
+                  <Text style={styles.meterIdText}>
+                    ID: {item.meterId.substring(0, 18)}...
+                  </Text>
+                </View>
+                <View style={styles.meterActions}>
+                  {/* 1. زر تعديل الاسم المستعار يفتح نافذة الـ Modal */}
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => {
+                      setMeterToRename(item);
+                      setNewAliasInput(item.alias);
+                      setIsRenameModalVisible(true);
+                    }}
+                  >
+                    <Text style={styles.actionBtnText}>تعديل الاسم</Text>
+                  </TouchableOpacity>
+                  {/* 2. زر تعيين الافتراضي يظهر كنجمة تفاعلية ملونة */}
+                  {!item.isDefault && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionBtn,
+                        { backgroundColor: theme.colors.secondary },
+                      ]}
+                      onPress={() =>
+                        handleSetDefaultMeter(item.preferenceId, item.meterId)
+                      }
+                    >
+                      <Text style={styles.actionBtnText}>تعيين كافتراضي</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            ))}
+        </CustomCard>
+      </View>
+
+      {/* كارت 4: إدارة الميزانية مع المبدل الأفقي لتحديد العداد المستهدف */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>
             إدارة الميزانية المالية والحدود الكهربائية
           </Text>
+          <Text style={styles.subLabel}>
+            حدد العداد المستهدف لتعيين أو تحديث ميزانيته الإجمالية بالليرة:
+          </Text>
+
+          {/* أزرار التبديل الأفقية للعدادات داخل كارت الميزانية */}
+          {user?.meters && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+            >
+              {user.meters.map((item) => {
+                const isSelected = item.meterId === activeBudgetMeterId;
+                return (
+                  <TouchableOpacity
+                    key={`budget-meter-${item.meterId}`}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: isSelected
+                          ? theme.colors.primary
+                          : "#E2E8F0",
+                      },
+                    ]}
+                    onPress={() => {
+                      setActiveBudgetMeterId(item.meterId);
+                      setBudgetSuccess("");
+                      setBudgetError("");
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: isSelected ? "#FFFFFF" : theme.colors.text },
+                      ]}
+                    >
+                      {item.alias}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
 
           <CustomInput
             label="الميزانية المالية المستهدفة (بالليرة السورية)"
             placeholder="أدخل قيمة الميزانية الإجمالية (مثال: 250000)"
             value={targetBudget}
-            onChangeText={setTargetBudget}
+            onChangeText={(text) => {
+              setTargetBudget(text);
+              setBudgetSuccess("");
+              setBudgetError("");
+            }}
             keyboardType="numeric"
             error={budgetError}
           />
-
           <CustomButton
             title={
-              isBudgetSubmitting ? "جاري الحفظ..." : "تحديث ميزانية العداد"
+              isBudgetSubmitting
+                ? "جاري الحفظ..."
+                : "تحديث ميزانية العداد المحدد"
             }
             onPress={handleUpdateBudget}
             color={theme.colors.secondary}
@@ -186,7 +301,7 @@ export default function SettingsScreen() {
         <CustomAlert type="success" message={budgetSuccess} />
       </View>
 
-      {/* كارت 4: تفضيلات إشعارات الدفع الخارجية */}
+      {/* كارت 5: تفضيلات إشعارات الدفع الخارجية */}
       <CustomCard>
         <Text style={styles.cardTitle}>
           تفضيلات وتصفية إشعارات الدفع (Push)
@@ -245,7 +360,7 @@ export default function SettingsScreen() {
         </View>
       </CustomCard>
 
-      {/* كارت 5: الخروج الآمن */}
+      {/* كارت 6: الخروج الآمن */}
       <CustomCard style={styles.logoutCard}>
         <Text style={styles.cardTitle}>أمان الجلسة والملف الشخصي</Text>
         <CustomButton
@@ -254,6 +369,59 @@ export default function SettingsScreen() {
           color={theme.colors.errorText}
         />
       </CustomCard>
+
+      {/* ==================== نافذة التعديل المنبثقة للأدوات (Rename Modal) ==================== */}
+      <Modal
+        visible={isRenameModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsRenameModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>تعديل الاسم المستعار للعداد</Text>
+            <Text style={styles.modalSub}>
+              رقم العداد: {meterToRename?.meterId.substring(0, 18)}...
+            </Text>
+
+            <CustomInput
+              placeholder="اكتب الاسم الجديد (مثال: عداد المحل)"
+              value={newAliasInput}
+              onChangeText={setNewAliasInput}
+            />
+
+            <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
+                onPress={handleRenameMeter}
+                disabled={isRenaming}
+              >
+                {isRenaming ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnText}>حفظ</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.border },
+                ]}
+                onPress={() => setIsRenameModalVisible(false)}
+              >
+                <Text
+                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+                >
+                  إلغاء
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -325,5 +493,109 @@ const styles = StyleSheet.create({
   },
   cardNoMargin: {
     marginBottom: 0,
+  },
+  // تنسيق قائمة العدادات الفاخرة
+  meterRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: theme.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F4F8",
+    width: "100%",
+  },
+  meterInfo: {
+    alignItems: "flex-start",
+  },
+  meterAlias: {
+    fontSize: 13.5,
+    fontWeight: "bold",
+    color: theme.colors.text,
+  },
+  meterIdText: {
+    fontSize: 10,
+    color: theme.colors.subtext,
+    marginTop: 2,
+    fontWeight: "600",
+  },
+  meterActions: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+  },
+  actionBtn: {
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: theme.spacing.xs,
+  },
+  actionBtnText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  // أزرار التبديل الأفقية للميزانية
+  chipsRow: {
+    paddingVertical: 4,
+    marginBottom: theme.spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  // واجهة المنبثقة الـ Modal للتعديل
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: theme.spacing.md,
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: theme.roundness,
+    padding: theme.spacing.lg,
+    width: "100%",
+    maxWidth: 360,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: theme.colors.primary,
+    marginBottom: 2,
+  },
+  modalSub: {
+    fontSize: 11,
+    color: theme.colors.subtext,
+    marginBottom: theme.spacing.md,
+    fontWeight: "600",
+  },
+  modalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: theme.spacing.sm,
+  },
+  modalBtn: {
+    paddingVertical: 10,
+    borderRadius: 8,
+    width: "48%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "bold",
   },
 });

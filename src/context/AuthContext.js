@@ -81,8 +81,23 @@ export const AuthProvider = ({ children }) => {
     loadStorageData();
   }, []);
 
+  // دالة مخصصة ومحترفة لتحديث ومزامنة بيانات المستخدم والعدادات محلياً في ذاكرة الهاتف عند أي تعديل سحابي
+  const updateUserData = async (updatedMeters, defaultMeterId) => {
+    if (user) {
+      const updatedUser = {
+        ...user,
+        defaultMeterId: defaultMeterId || user.defaultMeterId,
+        meters: updatedMeters || user.meters,
+      };
+      setUser(updatedUser);
+      await SecureStore.setItemAsync("user_data", JSON.stringify(updatedUser));
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ login, logout, isLoading, userToken, user }}>
+    <AuthContext.Provider
+      value={{ login, logout, isLoading, userToken, user, updateUserData }}
+    >
       {children}
     </AuthContext.Provider>
   );
