@@ -1,22 +1,19 @@
-import { useState, useEffect, useCallback, useContext } from "react";
+// core/hooks/useAnalytics.js - قبول معرف العداد كمعامل ديناميكي خارجي لمنع جمود الكود
+
+import { useState, useEffect, useCallback } from "react";
 import apiClient from "../api/apiClient";
-import { AuthContext } from "../context/AuthContext";
 
-export function useAnalytics() {
-  const { user } = useContext(AuthContext);
-  const meterId = user?.defaultMeterId; // قراءة معرف العداد المربوط بالحساب ديناميكياً
-
+export function useAnalytics(meterId) {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  // دالة جلب بيانات التحليلات والرسوم البيانية
+  // دالة جلب البيانات وتكامل الـ API بالتوقيت الفعلي المباشر
   const fetchAnalyticsData = useCallback(async () => {
     if (!meterId) return;
     setError("");
     try {
-      // التخاطب السحابي بالتوقيت الفعلي المباشر (خالٍ تماماً من المحاكاة)
       const response = await apiClient.get(`/api/meter/${meterId}/analytics/`);
       if (response.data.status === "success") {
         setData(response.data.data);

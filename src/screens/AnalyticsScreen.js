@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Dimensions,
+  TouchableOpacity,
 } from "react-native";
 import { LineChart, BarChart } from "react-native-chart-kit";
 import { Circle } from "react-native-svg";
@@ -15,16 +16,30 @@ import { Circle } from "react-native-svg";
 import CustomCard from "../components/CustomCard";
 import AlertBanner from "../components/AlertBanner";
 import { useAnalytics } from "../hooks/useAnalytics";
+import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 const CARD_INNER_WIDTH = SCREEN_WIDTH - 48; // نفس العرض المتاح داخل الكارت، بدون أي تمرير أفقي
 
 export default function AnalyticsScreen() {
-  const { data, isLoading, isRefreshing, error, onRefresh, meterId } =
-    useAnalytics();
+  const { user } = useContext(AuthContext);
 
-  if (!meterId) {
+  // 1. إدارة حالة العداد النشط في التحليلات (تبدأ من الافتراضي وتتبدل حراً ومستقلاً عن الداشبورد)
+  const [activeMeterId, setActiveMeterId] = useState(user?.defaultMeterId);
+
+  // تحديث التوجيه فوراً في حال تغير العداد الافتراضي للحساب
+  useEffect(() => {
+    if (user?.defaultMeterId) {
+      setActiveMeterId(user.defaultMeterId);
+    }
+  }, [user?.defaultMeterId]);
+
+  // استدعاء وتمرير العداد المختار حياً للـ Hook المطور
+  const { data, isLoading, isRefreshing, error, onRefresh, meterId } =
+    useAnalytics(activeMeterId);
+
+  if (!activeMeterId) {
     return (
       <View style={styles.loadingCenter}>
         <Text style={styles.loadingText}>
@@ -45,7 +60,7 @@ export default function AnalyticsScreen() {
     );
   }
 
-  // 1. اختصار أسماء الأشهر لأول 3 أحرف
+  // اختصار أسماء الأشهر لأول 3 أحرف
   const monthlyLabels =
     data?.monthlyHistory?.map((item) => {
       const parts = item.monthName.split(" ");
@@ -55,8 +70,7 @@ export default function AnalyticsScreen() {
     parseFloat(item.consumptionKWh)
   ) || [0];
 
-  // 2. إعداد مصفوفة الـ 15 يوماً الأخيرة
-  // نعرض تسمية كل 3 نقاط فقط لتجنب ازدحام النص (العرض ثابت الآن بدون تمرير)
+  // إعداد مصفوفة الـ 15 يوماً الأخيرة (RTL المنسق)
   const dailyLabels =
     data?.dailyHistory?.map((item, idx) =>
       idx % 3 === 0 ? item.date.split("-")[2] : ""
@@ -88,15 +102,11 @@ export default function AnalyticsScreen() {
     },
   };
 
-  // إعدادات خاصة بمخطط الأعمدة (السنوي): نبقيها كما هي بالضبط لأن التظليل
-  // والألوان طلعت جميلة زي ما هي، فقط نضيف حل تلاصق الأعمدة (barPercentage)
   const barChartConfig = {
     ...baseChartConfig,
     barPercentage: 0.45,
   };
 
-  // إعدادات خاصة بالمخطط الخطي (اليومي): بدون أي تظليل تحت المنحنى، وبدون
-  // نقاط افتراضية من المكتبة (سنرسمها نحن يدوياً بالأسفل عبر renderDotContent)
   const lineChartConfig = {
     ...baseChartConfig,
     fillShadowGradientOpacity: 0,
@@ -117,6 +127,48 @@ export default function AnalyticsScreen() {
         />
       }
     >
+      {/* 2. مبدل العدادات الأفقي التفاعلي (الأزرار البيضاوية الأنيقة Chips للتحليلات) */}
+      {user?.meters && user.meters.length > 1 && (
+        <View style={styles.switcherContainer}>
+          <Text style={styles.switcherTitle}>
+            العداد الكهربائي النشط في التحليلات:
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {user.meters.map((item) => {
+              const isSelected = item.meterId === activeMeterId;
+              return (
+                <TouchableOpacity
+                  key={item.meterId}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : "#E2E8F0",
+                    },
+                  ]}
+                  onPress={() => setActiveMeterId(item.meterId)} // تبديل العداد حياً وتحديث المخططات الذكية فوراً
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isSelected ? "#FFFFFF" : theme.colors.text },
+                    ]}
+                  >
+                    {item.alias}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* عرض خطأ الاتصال بالسيرفر إن وجد */}
       <AlertBanner type="error" message={error} />
 
       {/* المخطط الأول: الاستهلاك السنوي بالأعمدة المتباعدة */}
@@ -198,17 +250,7 @@ export default function AnalyticsScreen() {
             fromZero
             withShadow={false}
             style={styles.chart}
-            // نتحكم يدوياً بكل نقطة: المكتبة تستدعي هذا الكولباك لكل نقطة من كل
-            // الـ datasets بالترتيب (كل نقاط dailyActual أولاً، ثم dailyPredicted).
-            // بهيك منضمن 100% إنو المنحنى المتوقع ما يرسم ولا نقطة إطلاقاً،
-            // بدل الاعتماد على withDots اللي بيضل عم يفشل أحياناً حسب نسخة المكتبة.
-            // نرسم نقطة لكل قيمة من الاثنين، كل وحدة بموقعها الحقيقي (y الخاص فيها
-            // المبني على قيمتها الفعلية)، بس بلون وحجم مختلف حتى تنميّز عن بعض
-            // بوضوح حتى لو كانت قريبة من بعضها (لأن القيمتين قريبتين فعلياً في تلك النقطة).
-            // ملاحظة مهمة: المكتبة بترجع "index" يبدأ من صفر لكل dataset لحاله
-            // (مش رقم متسلسل عبر الاثنين)، فما بينفع نستخدمه لتمييز نوع
-            // الداتاسيت. الحل: نقارن قيمة النقطة نفسها (indexData) بمصفوفة
-            // الفعلي بنفس الموقع، وهيك نعرف بالتأكيد من أي منحنى جاية النقطة.
+            // رسم النقاط المتجهة يدوياً بدقة كاملة ومنع تداخل الحقول
             renderDotContent={({ x, y, index, indexData }) => {
               const isActualDataset = indexData === dailyActual[index];
 
@@ -263,7 +305,7 @@ export default function AnalyticsScreen() {
           </View>
         </CustomCard>
 
-        {/* صندوق تحذير كشف الخلل والشذوذ */}
+        {/* صندوق تحذير كشف الخلل والشذوذ الموضعي */}
         {hasAnomaly && (
           <Text style={styles.alertUnderCard}>
             ⚠️ تحذير عاجل: كشف النظام نمط استهلاك شاذ وغير اعتيادي (عطل أو تسريب
@@ -381,6 +423,38 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 12,
     color: theme.colors.text,
+    fontWeight: "bold",
+  },
+  // تنسيق مبدل العدادات الأفقي الأنيق
+  switcherContainer: {
+    marginBottom: theme.spacing.md,
+    width: "100%",
+  },
+  switcherTitle: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    alignSelf: "flex-start",
+  },
+  chipsRow: {
+    paddingVertical: 4,
+  },
+  chip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  chipText: {
+    fontSize: 12,
     fontWeight: "bold",
   },
 });
