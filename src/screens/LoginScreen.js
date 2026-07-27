@@ -7,24 +7,24 @@ import {
   Platform,
 } from "react-native";
 
-// استيراد المكونات المشتركة التي برمجناها (DTOs & Reusable Elements)
+// استيراد المكونات المحدثة والمشتركة
 import CustomInput from "../components/CustomInput";
 import CustomButton from "../components/CustomButton";
-import ErrorAlert from "../components/ErrorAlert";
+import CustomAlert from "../components/CustomAlert";
 
-// استيراد الـ Custom Hook المخصص والمحتضن لكامل منطق العمل والـ States
 import { useLoginForm } from "../hooks/useLoginForm";
 import { theme } from "../theme/theme";
 
 export default function LoginScreen() {
-  // تفكيك واستدعاء الحالات والوظائف من الـ Hook ب سطر واحد ومثالي (SRP)
   const {
     username,
     setUsername,
     password,
     setPassword,
     isLoading,
-    errorMsg,
+    usernameError,
+    passwordError,
+    globalError,
     handleLogin,
   } = useLoginForm();
 
@@ -39,27 +39,28 @@ export default function LoginScreen() {
           إدارة الطاقة والتنبؤ بالفواتير وكشف الخلل
         </Text>
 
-        {/* عرض صندوق الخطأ التفاعلي المشترك */}
-        <ErrorAlert message={errorMsg} />
+        {/* عرض التنبيه العام المشترك للخطأ السحابي */}
+        <CustomAlert type="error" message={globalError} />
 
-        {/* حقل إدخال اسم المستخدم المشترك */}
+        {/* حقل اسم المستخدم المجهز برابط التحذير الموضعي الأحمر */}
         <CustomInput
           label="اسم الحساب"
           placeholder="أدخل اسم المستخدم أو رقم الهاتف"
           value={username}
           onChangeText={setUsername}
+          error={usernameError}
         />
 
-        {/* حقل إدخال كلمة المرور المشترك المشفر */}
+        {/* حقل كلمة المرور المجهز برابط التحذير الموضعي الأحمر */}
         <CustomInput
           label="كلمة المرور"
           placeholder="أدخل كلمة المرور الخاصة بك"
           value={password}
           onChangeText={setPassword}
           secureTextEntry={true}
+          error={passwordError}
         />
 
-        {/* زر الدخول المشترك التفاعلي */}
         <CustomButton
           title="تسجيل الدخول الآمن"
           onPress={handleLogin}

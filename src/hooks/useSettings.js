@@ -8,83 +8,162 @@ export function useSettings() {
   const meterId = user?.defaultMeterId;
 
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
 
-  // أ. حالات الملف الشخصي والأمان (تحديث الحساب)
+  // ============================================================
+  // أ. حالات كارت رقم الهاتف (مستقلة تماماً - لها كلمة مرورها الخاصة)
+  // ============================================================
   const [newPhone, setNewPhone] = useState(user?.phoneNumber || "");
+  const [phoneCurrentPassword, setPhoneCurrentPassword] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [phoneSuccess, setPhoneSuccess] = useState("");
+  const [isPhoneSubmitting, setIsPhoneSubmitting] = useState(false);
+
+  // ============================================================
+  // ب. حالات كارت كلمة المرور (مستقلة تماماً)
+  // ============================================================
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // أخطاء منفصلة لكل حقل بدل رسالة عامة مربوطة بحقل واحد فقط
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [passwordError, setPasswordError] = useState(""); // خطأ عام (من السيرفر مثلاً)
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
-  // ب. حالات الميزانية بالليرة السورية
+  // ============================================================
+  // ج. حالات كارت الميزانية
+  // ============================================================
   const [targetBudget, setTargetBudget] = useState("");
+  const [budgetError, setBudgetError] = useState("");
+  const [budgetSuccess, setBudgetSuccess] = useState("");
+  const [isBudgetSubmitting, setIsBudgetSubmitting] = useState(false);
 
-  // ج. حالات تفضيلات إشعارات الدفع الخارجية (Toggles)
-  const [budgetPush, setBudgetPush] = useState(true);
-  const [tierPush, setTierPush] = useState(true);
-  const [anomalyPush, setAnomalyPush] = useState(true);
+  // ============================================================
+  // د. تفضيلات إشعارات الدفع (Toggles) - كائن واحد لتفادي الـ race condition
+  // ============================================================
+  const [notificationPrefs, setNotificationPrefs] = useState({
+    budgetPush: true,
+    tierPush: true,
+    anomalyPush: true,
+  });
 
-  // دالة جلب البيانات والتفضيلات الحالية للمستخدم من السيرفر عند التهيئة
   const fetchUserSettings = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      // إصلاح: كنا نرجع بدون تصفير isLoading، ما يسبب شاشة تحميل معلقة للأبد
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
-    setErrorMsg("");
     try {
-      // 1. جلب إعدادات الإشعارات التراكمية
       const resSettings = await apiClient.get(
         `/api/user/${userId}/notification_settings/`
       );
       if (resSettings.data.status === "success") {
         const d = resSettings.data.data;
-        setBudgetPush(d.budgetPushEnabled);
-        setTierPush(d.tierPushEnabled);
-        setAnomalyPush(d.anomalyPushEnabled);
-      }
-
-      // 2. جلب قيمة الميزانية الحالية المحددة للعداد إن وجدت
-      if (meterId) {
-        const resBudget = await apiClient.get(
-          `/api/meter/${meterId}/dashboard/`
-        );
-        if (
-          resBudget.data.status === "success" &&
-          resBudget.data.data.avgBudgetTargetKWh !== "0.00"
-        ) {
-          // جلب قيمة الميزانية الحالية الفعالة من السيرفر وعرضها
-          // سنتركها فارغة للإدخال الجديد أو نعرضها كقيمة توضيحية
-        }
+        setNotificationPrefs({
+          budgetPush: d.budgetPushEnabled,
+          tierPush: d.tierPushEnabled,
+          anomalyPush: d.anomalyPushEnabled,
+        });
       }
     } catch (err) {
-      console.log("فشل استرجاع الإعدادات من السيرفر:", err);
+      console.log("فشل استرجاع الإعدادات:", err);
     } finally {
       setIsLoading(false);
     }
-  }, [userId, meterId]);
+  }, [userId]);
 
-  // دالة تحديث بيانات الملف الشخصي (رقم الهاتف وكلمة المرور)
-  const handleUpdateProfile = async () => {
-    setErrorMsg("");
-    setSuccessMsg("");
+  // ------------------------------------------------------------
+  // 1. خدمة تعديل رقم الهاتف (endpoint مستقل تماماً)
+  // ------------------------------------------------------------
+  const handleUpdatePhone = async () => {
+    setPhoneError("");
+    setPhoneSuccess("");
 
-    if (!newPhone.trim() || !currentPassword.trim()) {
-      setErrorMsg(
-        "يرجى إدخال رقم الهاتف الجديد وكلمة المرور الحالية لتأكيد التعديل."
-      );
+    if (!newPhone.trim()) {
+      setPhoneError("حقل رقم الهاتف مطلوب لتعديله.");
+      return;
+    }
+    if (!phoneCurrentPassword.trim()) {
+      setPhoneError("يرجى إدخال كلمة المرور الحالية لتأكيد التعديل.");
       return;
     }
 
+    setIsPhoneSubmitting(true);
     try {
-      const response = await apiClient.post("/api/user/profile/update/", {
-        username: user?.username,
+      const response = await apiClient.post("/api/user/phone/update/", {
         newPhone: newPhone.trim(),
+        currentPassword: phoneCurrentPassword.trim(),
+      });
+
+      if (response.data.status === "success") {
+        setPhoneSuccess("تم تحديث رقم الهاتف ومزامنة حسابك بنجاح.");
+        setPhoneCurrentPassword("");
+      }
+    } catch (err) {
+      const msg =
+        err.response?.data?.message ||
+        "تعذر التعديل، يرجى التحقق من كلمة المرور المدخلة.";
+      setPhoneError(msg);
+    } finally {
+      setIsPhoneSubmitting(false);
+    }
+  };
+
+  // ------------------------------------------------------------
+  // 2. خدمة تعديل كلمة المرور (endpoint مستقل تماماً)
+  // ------------------------------------------------------------
+  const handleUpdatePassword = async () => {
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    const fieldErrors = {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    };
+    let hasError = false;
+
+    if (!currentPassword.trim()) {
+      fieldErrors.currentPassword = "هذا الحقل مطلوب.";
+      hasError = true;
+    }
+    if (!newPassword.trim()) {
+      fieldErrors.newPassword = "هذا الحقل مطلوب.";
+      hasError = true;
+    } else if (newPassword.trim().length < 8) {
+      fieldErrors.newPassword = "يجب ألا تقل كلمة المرور عن 8 أحرف.";
+      hasError = true;
+    }
+    if (!confirmPassword.trim()) {
+      fieldErrors.confirmPassword = "هذا الحقل مطلوب.";
+      hasError = true;
+    } else if (newPassword !== confirmPassword) {
+      fieldErrors.confirmPassword =
+        "كلمة المرور الجديدة وتأكيدها غير متطابقين.";
+      hasError = true;
+    }
+
+    if (hasError) {
+      setPasswordFieldErrors(fieldErrors);
+      return;
+    }
+    setPasswordFieldErrors(fieldErrors);
+
+    setIsPasswordSubmitting(true);
+    try {
+      const response = await apiClient.post("/api/user/password/update/", {
         currentPassword: currentPassword.trim(),
         newPassword: newPassword.trim(),
         confirmPassword: confirmPassword.trim(),
       });
 
       if (response.data.status === "success") {
-        setSuccessMsg("تم تحديث بيانات ملفك الشخصي وأمان الحساب بنجاح.");
+        setPasswordSuccess("تم تعديل وتحديث كلمة المرور بنجاح.");
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -92,66 +171,72 @@ export function useSettings() {
     } catch (err) {
       const msg =
         err.response?.data?.message ||
-        "تعذر تحديث الملف الشخصي، يرجى المحاولة لاحقاً.";
-      setErrorMsg(msg);
+        "تعذر التحديث، يرجى التأكد من كلمة المرور الحالية.";
+      setPasswordError(msg);
+    } finally {
+      setIsPasswordSubmitting(false);
     }
   };
 
-  // دالة تحديث ميزانية العداد وحساب الاستهلاك المعادل تلقائياً
+  // ------------------------------------------------------------
+  // 3. خدمة تعديل ميزانية العداد
+  // ------------------------------------------------------------
   const handleUpdateBudget = async () => {
-    setErrorMsg("");
-    setSuccessMsg("");
+    setBudgetError("");
+    setBudgetSuccess("");
 
-    if (!targetBudget.trim() || isNaN(targetBudget)) {
-      setErrorMsg(
-        "يرجى إدخال قيمة مالية صالحة للميزانية المستهدفة بالليرة السورية."
-      );
+    const trimmed = targetBudget.trim();
+    if (!trimmed || isNaN(trimmed) || Number(trimmed) <= 0) {
+      setBudgetError("يرجى إدخال قيمة مالية صالحة بالليرة السورية.");
       return;
     }
 
+    setIsBudgetSubmitting(true);
     try {
       const response = await apiClient.post(
         `/api/meter/${meterId}/budget/set/`,
-        {
-          targetBudgetSYP: parseFloat(targetBudget),
-        }
+        { targetBudgetSYP: parseFloat(trimmed) }
       );
 
       if (response.data.status === "success") {
-        setSuccessMsg(
-          `تم حفظ ميزانيتك الجديدة بنجاح، سقف استهلاكك المعادل هو ${response.data.data.equivalentLimitKWh} ك.و.س.`
+        setBudgetSuccess(
+          `تم حفظ ميزانيتك، سقف استهلاكك الجديد هو ${response.data.data.equivalentLimitKWh} ك.و.س.`
         );
         setTargetBudget("");
       }
     } catch (err) {
-      const msg = err.response?.data?.message || "تعذر حفظ الميزانية الجديدة.";
-      setErrorMsg(msg);
+      const msg = err.response?.data?.message || "تعذر حفظ الميزانية.";
+      setBudgetError(msg);
+    } finally {
+      setIsBudgetSubmitting(false);
     }
   };
 
-  // دالة التحديث التفاعلي اللحظي والآمن لتفضيلات الإشعارات (Toggles)
-  const handleTogglePreference = async (field, currentValue) => {
-    const newValue = !currentValue;
+  // ------------------------------------------------------------
+  // 4. تبديل تفضيلات الإشعارات - يعتمد على أحدث state دائماً (functional update)
+  //    هذا يحل مشكلة الـ race condition عند الضغط السريع المتتالي
+  // ------------------------------------------------------------
+  const handleTogglePreference = (field) => {
+    setNotificationPrefs((prev) => {
+      const updated = { ...prev, [field]: !prev[field] };
 
-    // تحديث الحالة المحلية في الهاتف فوراً لسرعة العرض (Optimistic UI)
-    if (field === "budget") setBudgetPush(newValue);
-    if (field === "tier") setTierPush(newValue);
-    if (field === "anomaly") setAnomalyPush(newValue);
+      // إرسال الطلب بالاعتماد على القيم المحدّثة فعلياً (لا نستخدم متغيرات قديمة من الإغلاق)
+      apiClient
+        .post(`/api/user/${userId}/notification_settings/`, {
+          budgetPushEnabled: updated.budgetPush,
+          tierPushEnabled: updated.tierPush,
+          anomalyPushEnabled: updated.anomalyPush,
+        })
+        .catch(() => {
+          // إذا فشل الطلب، أعد الحالة لما كانت عليه قبل التبديل
+          setNotificationPrefs((current) => ({
+            ...current,
+            [field]: prev[field],
+          }));
+        });
 
-    try {
-      // إرسال طلب تحديث صامت للسيرفر لمزامنة قاعدة البيانات
-      await apiClient.post(`/api/user/${userId}/notification_settings/`, {
-        budgetPushEnabled: field === "budget" ? newValue : budgetPush,
-        tierPushEnabled: field === "tier" ? newValue : tierPush,
-        anomalyPushEnabled: field === "anomaly" ? newValue : anomalyPush,
-      });
-    } catch (err) {
-      console.log("فشل مزامنة تفضيلات الإشعارات مع السيرفر:", err);
-      // التراجع عن التعديل في حال الفشل
-      if (field === "budget") setBudgetPush(currentValue);
-      if (field === "tier") setTierPush(currentValue);
-      if (field === "anomaly") setAnomalyPush(currentValue);
-    }
+      return updated;
+    });
   };
 
   useEffect(() => {
@@ -160,26 +245,38 @@ export function useSettings() {
 
   return {
     isLoading,
-    errorMsg,
-    successMsg,
-    setErrorMsg,
-    setSuccessMsg,
+    // هاتف
     newPhone,
     setNewPhone,
+    phoneCurrentPassword,
+    setPhoneCurrentPassword,
+    phoneError,
+    phoneSuccess,
+    isPhoneSubmitting,
+    handleUpdatePhone,
+    // كلمة مرور
     currentPassword,
     setCurrentPassword,
     newPassword,
     setNewPassword,
     confirmPassword,
     setConfirmPassword,
+    passwordFieldErrors,
+    passwordError,
+    passwordSuccess,
+    isPasswordSubmitting,
+    handleUpdatePassword,
+    // ميزانية
     targetBudget,
     setTargetBudget,
-    budgetPush,
-    tierPush,
-    anomalyPush,
-    handleUpdateProfile,
+    budgetError,
+    budgetSuccess,
+    isBudgetSubmitting,
     handleUpdateBudget,
+    // إشعارات
+    notificationPrefs,
     handleTogglePreference,
+    // عام
     logout,
     user,
   };

@@ -8,39 +8,49 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-// استيراد المكونات المشتركة
 import CustomCard from "../components/CustomCard";
 import CustomInput from "../components/CustomInput";
 import CustomButton from "../components/CustomButton";
-import ErrorAlert from "../components/ErrorAlert";
+import CustomAlert from "../components/CustomAlert";
 
-// استيراد الـ Hook المطور والثيم
 import { useSettings } from "../hooks/useSettings";
 import { theme } from "../theme/theme";
 
 export default function SettingsScreen() {
   const {
     isLoading,
-    errorMsg,
-    successMsg,
-    setErrorMsg,
-    setSuccessMsg,
+    // هاتف
     newPhone,
     setNewPhone,
+    phoneCurrentPassword,
+    setPhoneCurrentPassword,
+    phoneError,
+    phoneSuccess,
+    isPhoneSubmitting,
+    handleUpdatePhone,
+    // كلمة مرور
     currentPassword,
     setCurrentPassword,
     newPassword,
     setNewPassword,
     confirmPassword,
     setConfirmPassword,
+    passwordFieldErrors,
+    passwordError,
+    passwordSuccess,
+    isPasswordSubmitting,
+    handleUpdatePassword,
+    // ميزانية
     targetBudget,
     setTargetBudget,
-    budgetPush,
-    tierPush,
-    anomalyPush,
-    handleUpdateProfile,
+    budgetError,
+    budgetSuccess,
+    isBudgetSubmitting,
     handleUpdateBudget,
+    // إشعارات
+    notificationPrefs,
     handleTogglePreference,
+    // عام
     logout,
     user,
   } = useSettings();
@@ -61,157 +71,181 @@ export default function SettingsScreen() {
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
     >
-      {/* عرض صناديق الخطأ أو النجاح التفاعلية في الأعلى بالملي */}
-      <ErrorAlert message={errorMsg} />
+      {/* كارت 1: تعديل رقم الهاتف - مستقل تماماً بحقل كلمة مروره الخاص */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>إدارة معلومات وتفاصيل الحساب</Text>
+          <Text style={styles.usernameText}>
+            اسم الحساب الحالي: {user?.username}
+          </Text>
 
-      {successMsg ? (
-        <View style={styles.successContainer}>
-          <Text style={styles.successText}>{successMsg}</Text>
-        </View>
-      ) : null}
+          <CustomInput
+            label="رقم الهاتف الخلوي الجديد"
+            placeholder="أدخل رقم هاتفك الجديد"
+            value={newPhone}
+            onChangeText={setNewPhone}
+            keyboardType="phone-pad"
+          />
 
-      {/* الكارت 1: الملف الشخصي وأمان الحساب */}
-      <CustomCard>
-        <Text style={styles.cardTitle}>تعديل الملف الشخصي وأمان الحساب</Text>
-        <Text style={styles.usernameText}>اسم الحساب: {user?.username}</Text>
+          <CustomInput
+            label="كلمة المرور الحالية (لتأكيد التعديل)"
+            placeholder="أدخل كلمة مرورك الحالية"
+            value={phoneCurrentPassword}
+            onChangeText={setPhoneCurrentPassword}
+            secureTextEntry
+          />
 
-        <CustomInput
-          label="رقم الهاتف الخلوي الجديد"
-          placeholder="أدخل رقم هاتفك الجديد"
-          value={newPhone}
-          onChangeText={(text) => {
-            setNewPhone(text);
-            setSuccessMsg("");
-            setErrorMsg("");
-          }}
-          keyboardType="phone-pad"
-        />
+          <CustomButton
+            title={
+              isPhoneSubmitting
+                ? "جاري التحديث..."
+                : "تحديث رقم الهاتف ومزامنة الحساب"
+            }
+            onPress={handleUpdatePhone}
+            color={theme.colors.primary}
+            disabled={isPhoneSubmitting}
+          />
+        </CustomCard>
+        <CustomAlert type="error" message={phoneError} />
+        <CustomAlert type="success" message={phoneSuccess} />
+      </View>
 
-        <CustomInput
-          label="كلمة المرور الجديدة (اختياري)"
-          placeholder="أدخل كلمة مرور جديدة إن رغبت"
-          value={newPassword}
-          onChangeText={(text) => {
-            setNewPassword(text);
-            setSuccessMsg("");
-            setErrorMsg("");
-          }}
-          secureTextEntry={true}
-        />
+      {/* كارت 2: أمان الحساب وتعديل كلمة المرور - مستقل تماماً */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>أمان الحساب وتغيير كلمة المرور</Text>
 
-        <CustomInput
-          label="تأكيد كلمة المرور الجديدة"
-          placeholder="أعد إدخال كلمة المرور الجديدة للتأكيد"
-          value={confirmPassword}
-          onChangeText={(text) => {
-            setConfirmPassword(text);
-            setSuccessMsg("");
-            setErrorMsg("");
-          }}
-          secureTextEntry={true}
-        />
+          <CustomInput
+            label="كلمة المرور الحالية (إلزامية للتأكيد والحفظ)"
+            placeholder="أدخل كلمة مرورك الحالية"
+            value={currentPassword}
+            onChangeText={setCurrentPassword}
+            secureTextEntry
+            error={passwordFieldErrors.currentPassword}
+          />
 
-        <CustomInput
-          label="كلمة المرور الحالية (إلزامية للتأكيد)"
-          placeholder="أدخل كلمة مرورك الحالية لحفظ التعديلات"
-          value={currentPassword}
-          onChangeText={(text) => {
-            setCurrentPassword(text);
-            setSuccessMsg("");
-            setErrorMsg("");
-          }}
-          secureTextEntry={true}
-        />
+          <CustomInput
+            label="كلمة المرور الجديدة"
+            placeholder="أدخل كلمة المرور الجديدة"
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry
+            error={passwordFieldErrors.newPassword}
+          />
 
-        <CustomButton
-          title="حفظ بيانات الحساب"
-          onPress={handleUpdateProfile}
-          color={theme.colors.primary}
-        />
-      </CustomCard>
+          <CustomInput
+            label="تأكيد كلمة المرور الجديدة"
+            placeholder="أعد إدخال كلمة المرور للتأكيد"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry
+            error={passwordFieldErrors.confirmPassword}
+          />
 
-      {/* الكارت 2: إدارة الميزانية المالية والتعرفة العكسية */}
+          <CustomButton
+            title={
+              isPasswordSubmitting
+                ? "جاري الحفظ..."
+                : "تعديل وتحديث كلمة المرور"
+            }
+            onPress={handleUpdatePassword}
+            color={theme.colors.primary}
+            disabled={isPasswordSubmitting}
+          />
+        </CustomCard>
+        {/* خطأ عام (من السيرفر) يظهر تحت الكرت، منفصل عن أخطاء الحقول الفردية أعلاه */}
+        <CustomAlert type="error" message={passwordError} />
+        <CustomAlert type="success" message={passwordSuccess} />
+      </View>
+
+      {/* كارت 3: إدارة الميزانية المالية والتعرفة العكسية */}
+      <View style={styles.sectionContainer}>
+        <CustomCard style={styles.cardNoMargin}>
+          <Text style={styles.cardTitle}>
+            إدارة الميزانية المالية والحدود الكهربائية
+          </Text>
+
+          <CustomInput
+            label="الميزانية المالية المستهدفة (بالليرة السورية)"
+            placeholder="أدخل قيمة الميزانية الإجمالية (مثال: 250000)"
+            value={targetBudget}
+            onChangeText={setTargetBudget}
+            keyboardType="numeric"
+            error={budgetError}
+          />
+
+          <CustomButton
+            title={
+              isBudgetSubmitting ? "جاري الحفظ..." : "تحديث ميزانية العداد"
+            }
+            onPress={handleUpdateBudget}
+            color={theme.colors.secondary}
+            disabled={isBudgetSubmitting}
+          />
+        </CustomCard>
+        <CustomAlert type="success" message={budgetSuccess} />
+      </View>
+
+      {/* كارت 4: تفضيلات إشعارات الدفع الخارجية */}
       <CustomCard>
         <Text style={styles.cardTitle}>
-          إدارة الميزانية المالية والحدود الكهربائية
-        </Text>
-
-        <CustomInput
-          label="الميزانية المالية المستهدفة (بالليرة السورية)"
-          placeholder="أدخل قيمة الميزانية الإجمالية (مثال: 250000)"
-          value={targetBudget}
-          onChangeText={(text) => {
-            setTargetBudget(text);
-            setSuccessMsg("");
-            setErrorMsg("");
-          }}
-          keyboardType="numeric"
-        />
-
-        <CustomButton
-          title="تحديث ميزانية العداد"
-          onPress={handleUpdateBudget}
-          color={theme.colors.secondary}
-        />
-      </CustomCard>
-
-      {/* الكارت 3: تفضيلات إشعارات الدفع الخارجية (Toggles) */}
-      <CustomCard>
-        <Text style={styles.cardTitle}>
-          تفضيلات وتصفية إشعارات الدفع (Push Notifications)
+          تفضيلات وتصفية إشعارات الدفع (Push)
         </Text>
         <Text style={styles.subLabel}>
           تصفية التنبيهات الخارجية التي تظهر على شاشة الهاتف تجنباً للإزعاج:
         </Text>
 
-        {/* المفتاح 1: إشعارات الميزانية */}
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>
             إشعارات وتنبيهات الميزانية المالية
           </Text>
           <Switch
-            value={budgetPush}
-            onValueChange={() => handleTogglePreference("budget", budgetPush)}
+            value={notificationPrefs.budgetPush}
+            onValueChange={() => handleTogglePreference("budgetPush")}
             trackColor={{
               false: theme.colors.border,
               true: theme.colors.secondary,
             }}
-            thumbColor={budgetPush ? theme.colors.primary : "#F4F6F7"}
+            thumbColor={
+              notificationPrefs.budgetPush ? theme.colors.primary : "#F4F6F7"
+            }
           />
         </View>
 
-        {/* المفتاح 2: إشعارات الشرائح والدعم */}
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>إشعارات تجاوز الشريحة المدعومة</Text>
           <Switch
-            value={tierPush}
-            onValueChange={() => handleTogglePreference("tier", tierPush)}
+            value={notificationPrefs.tierPush}
+            onValueChange={() => handleTogglePreference("tierPush")}
             trackColor={{
               false: theme.colors.border,
               true: theme.colors.secondary,
             }}
-            thumbColor={tierPush ? theme.colors.primary : "#F4F6F7"}
+            thumbColor={
+              notificationPrefs.tierPush ? theme.colors.primary : "#F4F6F7"
+            }
           />
         </View>
 
-        {/* المفتاح 3: تحذيرات الأعطال والخلل */}
         <View style={styles.toggleRow}>
           <Text style={styles.toggleLabel}>
             تحذيرات وجود خلل أو عطل كهربائي (عاجل)
           </Text>
           <Switch
-            value={anomalyPush}
-            onValueChange={() => handleTogglePreference("anomaly", anomalyPush)}
+            value={notificationPrefs.anomalyPush}
+            onValueChange={() => handleTogglePreference("anomalyPush")}
             trackColor={{
               false: theme.colors.border,
               true: theme.colors.secondary,
             }}
-            thumbColor={anomalyPush ? theme.colors.primary : "#F4F6F7"}
+            thumbColor={
+              notificationPrefs.anomalyPush ? theme.colors.primary : "#F4F6F7"
+            }
           />
         </View>
       </CustomCard>
 
-      {/* الكارت 4: تسجيل الخروج الآمن والنهائي */}
+      {/* كارت 5: الخروج الآمن */}
       <CustomCard style={styles.logoutCard}>
         <Text style={styles.cardTitle}>أمان الجلسة والملف الشخصي</Text>
         <CustomButton
@@ -265,20 +299,7 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     lineHeight: 16,
     marginBottom: theme.spacing.md,
-  },
-  successContainer: {
-    backgroundColor: theme.colors.success,
-    padding: theme.spacing.sm,
-    borderRadius: 8,
-    marginBottom: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.successText,
-  },
-  successText: {
-    color: theme.colors.successText,
-    fontSize: 13,
-    textAlign: "center",
-    fontWeight: "600",
+    textAlign: "right",
   },
   toggleRow: {
     flexDirection: "row",
@@ -298,5 +319,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.errorText,
     backgroundColor: "#FFF2F2",
+  },
+  sectionContainer: {
+    marginBottom: theme.spacing.md,
+    width: "100%",
+  },
+  cardNoMargin: {
+    marginBottom: 0,
   },
 });

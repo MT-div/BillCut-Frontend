@@ -4,27 +4,38 @@ import { AuthContext } from "../context/AuthContext";
 export function useLoginForm() {
   const { login } = useContext(AuthContext);
 
-  // إدارة حالات حقول الإدخال والتحميل والأخطاء محلياً داخل الـ Hook
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
+
+  // فصل وتحديد أخطاء الحقول لتلوين مدخلاتها بالأحمر موضعياً
+  const [usernameError, setUsernameError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [globalError, setGlobalError] = useState("");
 
   const handleLogin = async () => {
-    // التحقق الفوري محلياً قبل التخاطب مع السيرفر
-    if (!username.trim() || !password.trim()) {
-      setErrorMsg("يرجى كتابة اسم المستخدم وكلمة المرور بالكامل.");
-      return false;
+    setUsernameError("");
+    setPasswordError("");
+    setGlobalError("");
+
+    let hasError = false;
+
+    if (!username.trim()) {
+      setUsernameError("اسم المستخدم مطلوب.");
+      hasError = true;
+    }
+    if (!password.trim()) {
+      setPasswordError("كلمة المرور مطلوبة.");
+      hasError = true;
     }
 
-    setErrorMsg("");
+    if (hasError) return false;
     setIsLoading(true);
 
-    // استدعاء خدمة تسجيل الدخول المشفرة للباكيند
     const result = await login(username.trim(), password.trim());
 
     if (result.status === "error") {
-      setErrorMsg(result.message);
+      setGlobalError(result.message);
       setIsLoading(false);
       return false;
     }
@@ -38,8 +49,10 @@ export function useLoginForm() {
     password,
     setPassword,
     isLoading,
-    errorMsg,
-    setErrorMsg,
+    usernameError,
+    passwordError,
+    globalError,
+    setGlobalError,
     handleLogin,
   };
 }
