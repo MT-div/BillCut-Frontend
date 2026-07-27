@@ -299,7 +299,6 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     lineHeight: 16,
     marginBottom: theme.spacing.md,
-    textAlign: "right",
   },
   toggleRow: {
     flexDirection: "row",

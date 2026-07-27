@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import {
   View,
   Button,
@@ -7,6 +7,7 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 
 // استيراد المكونات المشتركة
@@ -22,13 +23,21 @@ import { theme } from "../theme/theme";
 export default function DashboardScreen() {
   const { logout, user } = useContext(AuthContext);
 
-  // قراءة معرف العداد المربوط بالحساب ديناميكياً بالكامل لمنع جمود الكود
-  const meterId = user?.defaultMeterId;
+  // 1. إدارة حالة العداد النشط حالياً ديناميكياً (تبدأ من العداد الافتراضي للمستخدم)
+  const [activeMeterId, setActiveMeterId] = useState(user?.defaultMeterId);
 
+  // تحديث معرّف العداد النشط فوراً عند تغير العداد الافتراضي للجلسة
+  useEffect(() => {
+    if (user?.defaultMeterId) {
+      setActiveMeterId(user.defaultMeterId);
+    }
+  }, [user?.defaultMeterId]);
+
+  // تمرير معرّف العداد النشط المختار حالياً إلى الـ Hook لجلب بياناته حياً
   const { data, isLoading, isRefreshing, error, onRefresh } =
-    useDashboard(meterId); // يمرر المعرف الديناميكي المعتمد في الـ Token
+    useDashboard(activeMeterId);
 
-  if (!meterId) {
+  if (!activeMeterId) {
     return (
       <View style={styles.loadingCenter}>
         <Text style={styles.loadingText}>
@@ -55,12 +64,12 @@ export default function DashboardScreen() {
     );
   }
 
-  // 1. قراءة حدود ومستويات الدعم والميزانية والاستهلاك الفعلي من قاعدة البيانات
+  // قراءات الحدود والاستهلاك والتعرفة
   const supportLimit = parseFloat(data?.supportLimitKWh) || 300.0;
   const budgetLimit = parseFloat(data?.budgetLimitKWh) || 0.0;
   const actualConsumption = parseFloat(data?.cycleActualConsumptionKWh) || 0.0;
 
-  // 2. تفعيل رايات التحذير الكبرى لأعلى الشاشة لـ (الدعم والميزانية)
+  // تفعيل التنبيهات الكبرى في أعلى لوحة المراقبة
   const showSupportBanner = actualConsumption >= supportLimit;
   const showBudgetBanner = budgetLimit > 0 && actualConsumption >= budgetLimit;
 
@@ -74,7 +83,7 @@ export default function DashboardScreen() {
     ? "تنبيه: لقد تجاوزت الميزانية المالية المستهدفة والمحددة من قبلك لهذه الدورة الكهربائية."
     : null;
 
-  // 3. التحقق الرياضي الدقيق لتنشيط رسائل التجاوز الأربعة التكيفية وتنسيقها تحت كعب كل كارت بالملي
+  // التحقق الرياضي الدقيق لتنشيط رسائل التجاوز الأربعة التكيفية تحت كعب الكروت
   const isCycleExceeded =
     actualConsumption > parseFloat(data?.predictedCycleConsumptionKWh);
   const isTodayExceeded =
@@ -99,6 +108,45 @@ export default function DashboardScreen() {
         />
       }
     >
+      {/* 2. مبدل العدادات الأفقي التفاعلي (Chips) */}
+      {user?.meters && user.meters.length > 1 && (
+        <View style={styles.switcherContainer}>
+          <Text style={styles.switcherTitle}>العداد الكهربائي النشط:</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {user.meters.map((item) => {
+              const isSelected = item.meterId === activeMeterId;
+              return (
+                <TouchableOpacity
+                  key={item.meterId}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : "#E2E8F0",
+                    },
+                  ]}
+                  onPress={() => setActiveMeterId(item.meterId)} // تبديل العداد حياً وجلب بياناته بكسر من الثانية
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isSelected ? "#FFFFFF" : theme.colors.text },
+                    ]}
+                  >
+                    {item.alias}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
       {/* عرض خطأ الاتصال بالسيرفر إن وجد */}
       <AlertBanner type="error" message={error} />
 
@@ -109,7 +157,6 @@ export default function DashboardScreen() {
       <AlertBanner type="error" message={budgetBannerMessage} />
 
       <CustomCard style={styles.gaugeCard}>
-        {/* تعديل مسمى العنوان ليدل بدقة على القياس التراكمي ومقارنته بالحدود */}
         <Text style={styles.cardTitle}>
           مؤشر استهلاك الدورة مقارنة بحد الدعم والميزانية
         </Text>
@@ -119,18 +166,28 @@ export default function DashboardScreen() {
           {/* الدائرة الأولى: الدعم */}
           <View style={styles.gaugeContainer}>
             <ProgressGauge value={actualConsumption} max={supportLimit} />
-            <Text style={styles.gaugeLabel}>
-              مؤشر استهلاك الدورة بالنسبة لحد الدعم
+            <Text style={styles.gaugeLabel}>مؤشر استهلاك حد الدعم</Text>
+            {/* إضافة قيمة حد الدعم بالكيلوواط تحت الدائرة مباشرة */}
+            <Text style={styles.gaugeValueDetail}>
+              حد الدعم: {parseInt(supportLimit)} ك.و.س
             </Text>
           </View>
+
           {/* الدائرة الثانية: الميزانية */}
           <View style={styles.gaugeContainer}>
             <ProgressGauge
               value={actualConsumption}
               max={budgetLimit > 0 ? budgetLimit : 1.0}
             />
-            <Text style={styles.gaugeLabel}>
-              مؤشر استهلاك الدورة بالنسبة للميزانية
+            <Text style={styles.gaugeLabel}>مؤشر استهلاك الميزانية</Text>
+            {/* إضافة قيمة الميزانية بالليرة السورية تحت الدائرة مباشرة (حل الـ NaN) */}
+            <Text
+              style={[styles.gaugeValueDetail, { color: theme.colors.primary }]}
+            >
+              الميزانية:{" "}
+              {budgetLimit > 0
+                ? `${parseInt(data?.targetBudgetSYP)} ل.س`
+                : "غير محددة"}
             </Text>
           </View>
         </View>
@@ -173,7 +230,6 @@ export default function DashboardScreen() {
           <Text style={styles.cardTitle}>
             التقديرات المالية والاستهلاكية بنهاية الدورة (AI)
           </Text>
-          {/* عرض استهلاك الدورة المتوقع بالكيلوواط فوق الفاتورة المتوقعة */}
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>
               الاستهلاك الإجمالي المتوقع للدورة:
@@ -306,7 +362,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: theme.colors.text,
     marginBottom: theme.spacing.sm,
-    alignSelf: "center", // لتوسيط العنوان مع الدائرتين
+    alignSelf: "center",
     textAlign: "center",
   },
   smallCardTitle: {
@@ -334,14 +390,16 @@ const styles = StyleSheet.create({
     marginTop: theme.spacing.xs,
     lineHeight: 14,
   },
+  gaugeValueDetail: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginTop: 4,
+    textAlign: "center",
+  },
   gaugeStats: {
     alignItems: "center",
     marginTop: theme.spacing.sm,
-  },
-  statsText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: theme.colors.text,
   },
   dateRangeText: {
     fontSize: 11,
@@ -364,7 +422,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   infoRow: {
-    flexDirection: "row",
+    flexDirection: "row-reverse",
     justifyContent: "space-between",
     width: "100%",
     paddingVertical: theme.spacing.xs,
@@ -397,6 +455,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: theme.colors.errorText,
+    textAlign: "right",
     lineHeight: 16,
+  },
+  // تصميم مبدل العدادات الأفقي الأنيق
+  switcherContainer: {
+    marginBottom: theme.spacing.md,
+    width: "100%",
+  },
+  switcherTitle: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xs,
+    alignSelf: "flex-start",
+  },
+  chipsRow: {
+    paddingVertical: 4,
+  },
+  chip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: "bold",
   },
 });
