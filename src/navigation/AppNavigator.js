@@ -17,6 +17,7 @@ import NotificationScreen from "../screens/NotificationScreen";
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
+import SettingsScreen from "../screens/SettingsScreen";
 
 // ==================== أولاً: شاشات المحاكاة المؤقتة المنسقة (Mock Screens) ====================
 
@@ -27,16 +28,6 @@ const LoadingScreen = () => (
     <Text style={[styles.title, { marginTop: theme.spacing.md }]}>
       جاري تهيئة نظام BillCut وتأمين الاتصال...
     </Text>
-  </View>
-);
-
-// شاشة تسجيل الدخول الافتراضية
-
-// شاشات المشترك العادي (Resident Screens)
-
-const MockSettings = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>إعدادات الحساب وتفضيلات التنبيهات</Text>
   </View>
 );
 
@@ -118,7 +109,7 @@ const ResidentTabNavigator = () => (
     />
     <Tab.Screen
       name="الإعدادات"
-      component={MockSettings}
+      component={SettingsScreen}
       options={{ title: "إعدادات الحساب" }}
     />
   </Tab.Navigator>

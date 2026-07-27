@@ -10,7 +10,7 @@ import { theme } from "../theme/theme";
 export default function CustomButton({
   title,
   onPress,
-  isLoading = False,
+  isLoading = false,
   color,
 }) {
   const buttonColor = color || theme.colors.primary;
