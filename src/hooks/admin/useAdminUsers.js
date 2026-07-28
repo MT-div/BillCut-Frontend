@@ -7,14 +7,14 @@ export function useAdminUsers() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  // حالة فلترة البحث عن المشتركين
+  // نص البحث
   const [searchQuery, setSearchQuery] = useState("");
 
   // أ. حالات نافذة الإنشاء الجديد (Create Modal)
   const [isCreateVisible, setIsCreateVisible] = useState(false);
   const [newFullName, setNewFullName] = useState("");
   const [newPhone, setNewPhone] = useState("");
-  const [createdTempPassword, setCreatedTempPassword] = useState(""); // لعرض الباسورد للأدمن
+  const [createdTempPassword, setCreatedTempPassword] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
@@ -31,32 +31,36 @@ export function useAdminUsers() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // دالة جلب قائمة المستخدمين من السيرفر
-  const fetchUsers = useCallback(async () => {
-    setError("");
-    try {
-      const response = await apiClient.get("/api/admin/users/create/");
-      if (response.data.status === "success") {
-        setUsers(response.data.data);
+  // تحديث دالة الجلب لتقبل البحث السحابي المباشر عبر البارامترات
+  const fetchUsers = useCallback(
+    async (searchVal = searchQuery) => {
+      try {
+        const response = await apiClient.get("/api/admin/users/create/", {
+          params: { search: searchVal.trim() }, // # إرسال نص البحث كـ Query Parameter للسيرفر
+        });
+        if (response.data.status === "success") {
+          setUsers(response.data.data);
+        }
+      } catch (err) {
+        setError("تعذر جلب قائمة المستخدمين النشطين من السيرفر.");
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
-    } catch (err) {
-      setError("تعذر جلب قائمة المستخدمين النشطين من السيرفر.");
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+    },
+    [searchQuery]
+  );
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
     fetchUsers();
   }, [fetchUsers]);
 
+  // تحديث تلقائي وفوري لجلب البيانات المفلترة من السيرفر كلما قام الأدمن بتحديث نص البحث
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, [searchQuery]); // # مراقبة نص البحث لإرسال الطلب فوراً
 
-  // 1. خدمة إنشاء حساب مستخدم جديد
   const handleCreateUser = async () => {
     setCreateError("");
     if (!newFullName.trim() || !newPhone.trim()) {
@@ -72,11 +76,10 @@ export function useAdminUsers() {
       });
 
       if (response.data.status === "success") {
-        // عرض الباسورد المؤقت للمدير لنسخه ومشاركته مع العميل
         setCreatedTempPassword(response.data.data.temporaryPassword);
         setNewFullName("");
         setNewPhone("");
-        fetchUsers(); // تحديث القائمة الحية فورا
+        fetchUsers();
       }
     } catch (err) {
       setCreateError(err.response?.data?.message || "فشلت عملية إنشاء الحساب.");
@@ -85,7 +88,6 @@ export function useAdminUsers() {
     }
   };
 
-  // 2. خدمة تعديل بيانات مستخدم قائم
   const handleUpdateUser = async () => {
     setEditError("");
     if (!editFullName.trim() || !editPhone.trim() || !selectedUser) {
@@ -115,7 +117,6 @@ export function useAdminUsers() {
     }
   };
 
-  // 3. خدمة حذف حساب مستخدم نهائياً
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
     setIsDeleting(true);
@@ -135,22 +136,14 @@ export function useAdminUsers() {
     }
   };
 
-  // تصفية وقراءة قائمة المستخدمين بناءً على مربع البحث حياً في الذاكرة لسرعة الأداء
-  const filteredUsers = users.filter(
-    (u) =>
-      u.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.phoneNumber.includes(searchQuery)
-  );
-
   return {
-    filteredUsers,
+    filteredUsers: users, // أصبحت القائمة مفلترة ومجهزة سلفاً من السيرفر بكفاءة كاملة
     isLoading,
     isRefreshing,
     error,
     onRefresh,
     searchQuery,
     setSearchQuery,
-    // إنشاء
     isCreateVisible,
     setIsCreateVisible,
     newFullName,
@@ -162,7 +155,6 @@ export function useAdminUsers() {
     isCreating,
     createError,
     handleCreateUser,
-    // تعديل
     isEditVisible,
     setIsEditVisible,
     selectedUser,
@@ -174,7 +166,6 @@ export function useAdminUsers() {
     isUpdating,
     editError,
     handleUpdateUser,
-    // حذف
     isDeleteVisible,
     setIsDeleteVisible,
     userToDelete,
