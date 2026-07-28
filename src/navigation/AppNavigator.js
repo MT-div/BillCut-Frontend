@@ -3,25 +3,27 @@ import {
   View,
   Text,
   StyleSheet,
-  Button,
+  ScrollView,
+  RefreshControl,
   ActivityIndicator,
 } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import LoginScreen from "../screens/LoginScreen";
+
+// استيراد شاشات المستهلك الحقيقية
 import DashboardScreen from "../screens/DashboardScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
-// أضف استيراد شاشة الإشعارات الحقيقية في أعلى ملف AppNavigator.js
-import NotificationScreen from "../screens/NotificationScreen";
+
+// استيراد شاشات مدير النظام الحقيقية
+import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
+
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
-import SettingsScreen from "../screens/SettingsScreen";
 
 // ==================== أولاً: شاشات المحاكاة المؤقتة المنسقة (Mock Screens) ====================
 
-// شاشة انتظار التحميل الذاتي للجلسة (Spinner)
 const LoadingScreen = () => (
   <View style={[styles.center, { backgroundColor: theme.colors.background }]}>
     <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -31,22 +33,18 @@ const LoadingScreen = () => (
   </View>
 );
 
-// شاشات مدير النظام (Admin Screens)
-const MockAdminHome = () => {
-  const { logout, user } = useContext(AuthContext);
-  return (
-    <View style={styles.center}>
-      <Text style={styles.title}>لوحة التحكم الإدارية الكبرى لمدير النظام</Text>
-      <Text style={styles.userText}>المدير النشط حالياً: {user?.fullName}</Text>
-      <Button
-        title="تسجيل الخروج الآمن"
-        color={theme.colors.errorText}
-        onPress={logout}
-      />
-    </View>
-  );
-};
+const MockNotifications = () => (
+  <View style={styles.center}>
+    <Text style={styles.title}>مركز الإشعارات وأرشيف التنبيهات</Text>
+  </View>
+);
+const MockSettings = () => (
+  <View style={styles.center}>
+    <Text style={styles.title}>إعدادات الحساب وتفضيلات التنبيهات</Text>
+  </View>
+);
 
+// شاشات الأدمن المؤقتة لحين برمجتها
 const MockAdminUsers = () => (
   <View style={styles.center}>
     <Text style={styles.title}>إدارة وحوكمة حسابات المستخدمين (CRUD)</Text>
@@ -76,7 +74,6 @@ const AuthNavigator = () => (
 );
 
 // 2. مسار المستهلك المنزلي الموزع سفلياً (Resident Bottom Tab)
-
 const ResidentTabNavigator = () => (
   <Tab.Navigator
     screenOptions={{
@@ -104,12 +101,12 @@ const ResidentTabNavigator = () => (
     />
     <Tab.Screen
       name="الإشعارات"
-      component={NotificationScreen}
+      component={MockNotifications}
       options={{ title: "مركز التنبيهات" }}
     />
     <Tab.Screen
       name="الإعدادات"
-      component={SettingsScreen}
+      component={MockSettings}
       options={{ title: "إعدادات الحساب" }}
     />
   </Tab.Navigator>
@@ -131,9 +128,10 @@ const AdminTabNavigator = () => (
       headerTitleStyle: { fontWeight: "bold" },
     }}
   >
+    {/* ربط شاشة الأدمن الحقيقية الجديدة لتكون أول تبويب نشط للأدمن */}
     <Tab.Screen
       name="الرئيسية"
-      component={MockAdminHome}
+      component={AdminHomeScreen}
       options={{ title: "لوحة التحكم الإدارية" }}
     />
     <Tab.Screen
@@ -157,9 +155,8 @@ const AdminTabNavigator = () => (
 // ==================== ثالثاً: الموجه الرئيسي الحارس للمسارات (Root App Navigator) ====================
 
 export const AppNavigator = () => {
-  const { isLoading, userToken, user } = useContext(AuthContext);
+  const { isLoading, userToken, user, viewMode } = useContext(AuthContext);
 
-  // عرض واجهة التحميل الدائري لحين قراءة الذاكرة المشفرة للهاتف وصلاحية الجلسة
   if (isLoading) {
     return <LoadingScreen />;
   }
@@ -167,20 +164,16 @@ export const AppNavigator = () => {
   return (
     <NavigationContainer>
       {!userToken ? (
-        // إذا لم يسجل الدخول، يحمل مسار الدخول ويحظر الشاشات الداخلية تماماً
         <AuthNavigator />
-      ) : user?.role === "ADMIN" ? (
-        // إذا سجل كمدير، يحمل مسار الأدمن المخصص بالكامل
-        <AdminTabNavigator />
+      ) : user?.role === "ADMIN" && viewMode === "admin" ? (
+        <AdminTabNavigator /> // # حل المشكلة: توجيه الأدمن لـ الـ TabNavigator ليظهر البار العلوي والسفلي فورا!
       ) : (
-        // إذا سجل كمستهلك، يحمل مسار المشترك المخصص بالكامل
         <ResidentTabNavigator />
       )}
     </NavigationContainer>
   );
 };
 
-// تنسيقات شاشات المحاكاة
 const styles = StyleSheet.create({
   center: {
     flex: 1,
@@ -189,42 +182,11 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#EDF2F7",
   },
-  mainTitle: {
-    fontSize: 26,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
   title: {
     fontSize: 18,
     fontWeight: "bold",
     textAlign: "center",
     color: "#17202A",
     marginBottom: 15,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#5D6D7E",
-    textAlign: "center",
-    marginBottom: 40,
-  },
-  userText: {
-    fontSize: 15,
-    color: "#1B4F72",
-    marginBottom: 30,
-    fontWeight: "600",
-  },
-  errorText: {
-    color: "#721C24",
-    backgroundColor: "#F8D7DA",
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 20,
-    textAlign: "center",
-    width: "100%",
-    fontWeight: "600",
-  },
-  buttonContainer: {
-    width: "100%",
-    paddingHorizontal: 20,
   },
 });

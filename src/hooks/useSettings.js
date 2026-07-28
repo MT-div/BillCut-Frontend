@@ -306,5 +306,7 @@ export function useSettings() {
     handleTogglePreference,
     logout,
     user,
+    setBudgetError,
+    setBudgetSuccess,
   };
 }

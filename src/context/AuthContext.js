@@ -11,8 +11,11 @@ export const AuthProvider = ({ children }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [userToken, setUserToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [viewMode, setViewMode] = useState("admin"); // 'admin' أو 'resident'
 
-  // 1. دالة تسجيل الدخول والتواصل مع السيرفر الخلفي لـ BillCut
+  useEffect(() => {
+    loadStorageData();
+  }, []);
   const login = async (username, password) => {
     setIsLoading(true);
     try {
@@ -20,14 +23,14 @@ export const AuthProvider = ({ children }) => {
         username,
         password,
       });
-
       if (response.data.status === "success") {
         const { access, refresh } = response.data.tokens;
         const userData = response.data.user;
 
-        // حفظ الـ Tokens مشفرة في الذاكرة العشوائية السحابية للتطبيق وللهاتف عتادياً
         setUserToken(access);
         setUser(userData);
+        // ضبط وضع العرض الافتراضي بناءً على دور المستخدم
+        setViewMode(userData.role === "ADMIN" ? "admin" : "resident");
 
         await SecureStore.setItemAsync("access_token", access);
         await SecureStore.setItemAsync("refresh_token", refresh);
@@ -38,49 +41,44 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       setIsLoading(false);
-      const errorMsg =
-        error.response?.data?.message ||
-        "تعذر الاتصال بالسيرفر، يرجى التحقق من الشبكة.";
-      return { status: "error", message: errorMsg };
+      return {
+        status: "error",
+        message: error.response?.data?.message || "تعذر الاتصال بالسيرفر.",
+      };
     }
   };
 
-  // 2. دالة تسجيل الخروج ومسح الـ Tokens المشفرة نهائياً من الهاتف لضمان الأمان
   const logout = async () => {
     setIsLoading(true);
-    try {
-      setUserToken(null);
-      setUser(null);
-      await SecureStore.deleteItemAsync("access_token");
-      await SecureStore.deleteItemAsync("refresh_token");
-      await SecureStore.deleteItemAsync("user_data");
-    } catch (e) {
-      console.log("خطأ أثناء تسجيل الخروج:", e);
-    }
+    setUserToken(null);
+    setUser(null);
+    setViewMode("admin");
+    await SecureStore.deleteItemAsync("access_token");
+    await SecureStore.deleteItemAsync("refresh_token");
+    await SecureStore.deleteItemAsync("user_data");
     setIsLoading(false);
   };
 
-  // 3. دالة التحقق الذاتي عند فتح التطبيق لأول مرة (Silent Login)
+  // دالة تبديل وضع العرض للأدمن بين لوحة الإدارة وواجهة المستهلك العادي
+  const toggleViewMode = () => {
+    setViewMode((prev) => (prev === "admin" ? "resident" : "admin"));
+  };
+
   const loadStorageData = async () => {
     try {
       const accessToken = await SecureStore.getItemAsync("access_token");
       const savedUserData = await SecureStore.getItemAsync("user_data");
-
       if (accessToken && savedUserData) {
+        const parsedUser = JSON.parse(savedUserData);
         setUserToken(accessToken);
-        setUser(JSON.parse(savedUserData));
+        setUser(parsedUser);
+        setViewMode(parsedUser.role === "ADMIN" ? "admin" : "resident");
       }
     } catch (e) {
-      console.log("فشل قراءة الذاكرة المشفرة للهاتف:", e);
+      console.log("فشل قراءة الذاكرة المشفرة:", e);
     }
     setIsLoading(false);
   };
-
-  // تشغيل الفحص الذاتي للجلسة فور فتح التطبيق
-  useEffect(() => {
-    loadStorageData();
-  }, []);
-
   // دالة مخصصة ومحترفة لتحديث ومزامنة بيانات المستخدم والعدادات محلياً في ذاكرة الهاتف عند أي تعديل سحابي
   const updateUserData = async (updatedMeters, defaultMeterId) => {
     if (user) {
@@ -96,7 +94,16 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ login, logout, isLoading, userToken, user, updateUserData }}
+      value={{
+        login,
+        logout,
+        isLoading,
+        userToken,
+        user,
+        viewMode,
+        toggleViewMode,
+        updateUserData,
+      }}
     >
       {children}
     </AuthContext.Provider>

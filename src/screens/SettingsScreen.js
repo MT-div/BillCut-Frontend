@@ -66,7 +66,11 @@ export default function SettingsScreen() {
     notificationPrefs,
     handleTogglePreference,
     logout,
+
     user,
+
+    setBudgetError,
+    setBudgetSuccess,
   } = useSettings();
 
   if (isLoading) {
