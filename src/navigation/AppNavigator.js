@@ -18,7 +18,8 @@ import AnalyticsScreen from "../screens/AnalyticsScreen";
 // استيراد شاشات مدير النظام الحقيقية
 import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
 import AdminUsersScreen from "../screens/admin/AdminUsersScreen";
-
+import AdminMetersScreen from "../screens/admin/AdminMetersScreen";
+import LoginScreen from "../screens/LoginScreen";
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
@@ -45,13 +46,6 @@ const MockSettings = () => (
   </View>
 );
 
-// شاشات الأدمن المؤقتة لحين برمجتها
-
-const MockAdminMeters = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>إدارة وحوكمة العدادات وإسناد الصلاحيات</Text>
-  </View>
-);
 const MockAdminTariff = () => (
   <View style={styles.center}>
     <Text style={styles.title}>تحديث وإصدار الشرائح والتعرفة الحكومية</Text>
@@ -138,7 +132,7 @@ const AdminTabNavigator = () => (
     />
     <Tab.Screen
       name="العدادات"
-      component={MockAdminMeters}
+      component={AdminMetersScreen}
       options={{ title: "إدارة العدادات والأجهزة" }}
     />
     <Tab.Screen
