@@ -10,13 +10,13 @@ import {
   Modal,
 } from "react-native";
 
-// استيراد المكونات المشتركة والثيم
+// استيراد المكونات المحدثة والمشتركة
 import CustomCard from "../../components/CustomCard";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert";
 import AlertBanner from "../../components/AlertBanner";
-``;
+
 import { useAdminUsers } from "../../hooks/admin/useAdminUsers";
 import { theme } from "../../theme/theme";
 
@@ -25,10 +25,15 @@ export default function AdminUsersScreen() {
     filteredUsers,
     isLoading,
     isRefreshing,
+    isLoadingMore,
     error,
     onRefresh,
     searchQuery,
     setSearchQuery,
+    isSearching,
+    handleSearchSubmit,
+    loadMore,
+    hasMore,
     isCreateVisible,
     setIsCreateVisible,
     newFullName,
@@ -53,7 +58,6 @@ export default function AdminUsersScreen() {
     isDeleteVisible,
     setIsDeleteVisible,
     userToDelete,
-
     setUserToDelete,
     isDeleting,
     handleDeleteUser,
@@ -103,6 +107,17 @@ export default function AdminUsersScreen() {
     );
   };
 
+  // مكوّن رسومي يظهر سبينر تحميل صغير في أسفل القائمة فقط أثناء تصفح وجلب الصفحة التالية
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.footerText}>جاري تحميل المزيد من المشتركين...</Text>
+      </View>
+    );
+  };
+
   if (isLoading && !isRefreshing) {
     return (
       <View style={styles.loadingCenter}>
@@ -118,13 +133,36 @@ export default function AdminUsersScreen() {
     <View style={styles.container}>
       <AlertBanner type="error" message={error} />
 
-      {/* 1. مربع البحث السريع في الأعلى المجهز بالـ RTL العربي الأصلي */}
+      {/* 1. مربع البحث السريع والزر الموجه والمحمي أفقياً بجانبه تماماً */}
       <View style={styles.headerBox}>
-        <CustomInput
-          placeholder="ابحث بالاسم أو رقم الهاتف..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
+        <View style={styles.searchRow}>
+          <View style={styles.searchInputContainer}>
+            <CustomInput
+              placeholder="ابحث بالاسم أو رقم الهاتف..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.searchBtn,
+              {
+                backgroundColor: isSearching
+                  ? theme.colors.subtext
+                  : theme.colors.primary,
+              },
+            ]}
+            onPress={handleSearchSubmit}
+            disabled={isSearching} // # يعطل الزر أثناء الاتصال حماية للسيرفر
+          >
+            {isSearching ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.searchBtnText}>بحث</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        <View style={{ height: theme.spacing.sm }} />
         <CustomButton
           title="➕ إنشاء حساب مشترك جديد"
           onPress={() => {
@@ -135,7 +173,7 @@ export default function AdminUsersScreen() {
         />
       </View>
 
-      {/* 2. قائمة المشتركين التفاعلية عالية الأداء */}
+      {/* 2. قائمة المشتركين التفاعلية عالية الأداء المجهزة بالتحميل اللانهائي */}
       <FlatList
         data={filteredUsers}
         keyExtractor={(item, index) => item.id?.toString() || index.toString()}
@@ -148,6 +186,10 @@ export default function AdminUsersScreen() {
             colors={[theme.colors.primary]}
           />
         }
+        // # ربط التصفح اللانهائي والـ Lazy Load لـ 10 مشتركين في كل سحبة
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.2}
+        ListFooterComponent={renderFooter}
         ListEmptyComponent={
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyText}>لا يوجد مشتركين مسجلين حالياً.</Text>
@@ -176,7 +218,8 @@ export default function AdminUsersScreen() {
                   يرجى نسخ بيانات الدخول المؤقتة ومشاركتها مع المستهلك:
                 </Text>
                 <Text style={styles.pwdValue}>
-                  اسم الحساب: user_{(newPhone || "").slice(-10)}
+                  {" "}
+                  اسم الحساب: user_{newPhone.slice(-10)}
                 </Text>
                 <Text style={styles.pwdValue}>
                   كلمة المرور: {createdTempPassword}
@@ -184,7 +227,10 @@ export default function AdminUsersScreen() {
                 <View style={{ height: theme.spacing.sm }} />
                 <CustomButton
                   title="إغلاق وتمام الحفظ"
-                  onPress={() => setIsCreateVisible(false)}
+                  onPress={() => {
+                    setIsCreateVisible(false);
+                    setNewPhone("");
+                  }}
                   color={theme.colors.primary}
                 />
               </View>
@@ -297,7 +343,7 @@ export default function AdminUsersScreen() {
         </View>
       </Modal>
 
-      {/* ==================== ج. نافذة تأكيد الحذف النهائي (Delete Confirmation Modal) ==================== */}
+      {/* ==================== ج. نافذة تأكيد الحذف النهائي (Delete Confirmation) ==================== */}
       <Modal
         visible={isDeleteVisible}
         transparent
@@ -367,6 +413,29 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
+  },
+  searchRow: {
+    flexDirection: "row", // مواءمة أفقية ممتازة للبحث والزر بجانبه
+    justifyContent: "space-between",
+    alignItems: "center",
+    width: "100%",
+  },
+  searchInputContainer: {
+    width: "78%", // حقل الإدخال يأخذ معظم العرض المتاح
+    marginBottom: -12, // موازنة ميكانيكية لعمق المارجن الأسفل لـ CustomInput
+  },
+  searchBtn: {
+    width: "20%", // زر البحث يأخذ 20% ليتناسقا معاً
+    height: 48,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  searchBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "bold",
   },
   listContent: {
     padding: theme.spacing.md,
@@ -533,5 +602,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     borderWidth: 1,
     borderColor: theme.colors.border,
+  },
+  footerLoader: {
+    paddingVertical: theme.spacing.sm,
+    justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
+  },
+  footerText: {
+    fontSize: 11,
+    color: theme.colors.subtext,
+    marginTop: 4,
+    fontWeight: "600",
   },
 });
