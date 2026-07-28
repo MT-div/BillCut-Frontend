@@ -13,9 +13,12 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 
 // استيراد شاشات المستهلك الحقيقية
 import DashboardScreen from "../screens/DashboardScreen";
+import SettingsScreen from "../screens/SettingsScreen";
+import NotificationScreen from "../screens/NotificationScreen";
 import AnalyticsScreen from "../screens/AnalyticsScreen";
 
 // استيراد شاشات مدير النظام الحقيقية
+import AdminTariffScreen from "../screens/admin/AdminTariffScreen";
 import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
 import AdminUsersScreen from "../screens/admin/AdminUsersScreen";
 import AdminMetersScreen from "../screens/admin/AdminMetersScreen";
@@ -32,23 +35,6 @@ const LoadingScreen = () => (
     <Text style={[styles.title, { marginTop: theme.spacing.md }]}>
       جاري تهيئة نظام BillCut وتأمين الاتصال...
     </Text>
-  </View>
-);
-
-const MockNotifications = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>مركز الإشعارات وأرشيف التنبيهات</Text>
-  </View>
-);
-const MockSettings = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>إعدادات الحساب وتفضيلات التنبيهات</Text>
-  </View>
-);
-
-const MockAdminTariff = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>تحديث وإصدار الشرائح والتعرفة الحكومية</Text>
   </View>
 );
 
@@ -92,12 +78,12 @@ const ResidentTabNavigator = () => (
     />
     <Tab.Screen
       name="الإشعارات"
-      component={MockNotifications}
+      component={NotificationScreen}
       options={{ title: "مركز التنبيهات" }}
     />
     <Tab.Screen
       name="الإعدادات"
-      component={MockSettings}
+      component={SettingsScreen}
       options={{ title: "إعدادات الحساب" }}
     />
   </Tab.Navigator>
@@ -137,7 +123,7 @@ const AdminTabNavigator = () => (
     />
     <Tab.Screen
       name="التعرفة والشرائح"
-      component={MockAdminTariff}
+      component={AdminTariffScreen}
       options={{ title: "التعرفة الحكومية" }}
     />
   </Tab.Navigator>
