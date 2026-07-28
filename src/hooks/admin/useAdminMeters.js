@@ -7,6 +7,7 @@ export function useAdminMeters() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
   // ============================================================
@@ -14,7 +15,6 @@ export function useAdminMeters() {
   // ============================================================
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const limit = 10;
@@ -65,9 +65,12 @@ export function useAdminMeters() {
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
 
-  // ------------------------------------------------------------
-  // 1. خوارزمية جلب العدادات المرقّمة (التبويب الأول)
-  // ------------------------------------------------------------
+  // هـ. حالات نافذة تأكيد إلغاء الإسناد من التبويب الأول (Unassign Confirmation)
+  const [isUnassignVisible, setIsUnassignVisible] = useState(false);
+  const [associationToUnassign, setAssociationToUnassign] = useState(null); // يحفظ كائن الارتباط المراد فكه
+  const [isUnassigning, setIsUnassigning] = useState(false);
+
+  // 1. جلب العدادات المرقّمة (التبويب الأول)
   const fetchMeters = useCallback(
     async (isInitial = true, searchVal = searchQuery) => {
       if (isInitial) {
@@ -116,12 +119,13 @@ export function useAdminMeters() {
     },
     [offset, meters.length, searchQuery]
   );
+
   useEffect(() => {
     if (activeTab === "meters") {
       fetchMeters(true, "");
     }
-  }, []);
-  // دالة تحميل المزيد للتبويب الأول (Infinite Scroll)
+  }, [activeTab]);
+
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || isLoading || isSearching) return;
     fetchMeters(false, searchQuery);
@@ -134,9 +138,7 @@ export function useAdminMeters() {
     searchQuery,
   ]);
 
-  // ------------------------------------------------------------
-  // 2. خوارزمية جلب المشتركين المرقّمة للـ Picker الأول (التبويب الثاني)
-  // ------------------------------------------------------------
+  // 2. جلب المشتركين المرقّمة للـ Picker الأول (التبويب الثاني)
   const fetchUsersForPicker = useCallback(
     async (isInitial = true, searchVal = userSearchQuery) => {
       if (isInitial) {
@@ -182,20 +184,16 @@ export function useAdminMeters() {
     [userOffset, usersList.length, userSearchQuery]
   );
 
-  // دالة تحميل المزيد للمشتركين داخل الـ Picker (Infinite Scroll)
   const loadMoreUsers = useCallback(() => {
     if (isLoadingMoreUsers || !userHasMore) return;
     fetchUsersForPicker(false, userSearchQuery);
   }, [isLoadingMoreUsers, userHasMore, fetchUsersForPicker, userSearchQuery]);
 
-  // دالة إطلاق البحث الموجه للمشتركين بداخل الـ Picker
   const handleUserSearchSubmit = () => {
     fetchUsersForPicker(true, userSearchQuery);
   };
 
-  // ------------------------------------------------------------
-  // 3. خوارزمية جلب العدادات المرقّمة للـ Picker الثاني (التبويب الثاني)
-  // ------------------------------------------------------------
+  // 3. جلب العدادات المرقّمة للـ Picker الثاني (التبويب الثاني)
   const fetchMetersForPicker = useCallback(
     async (isInitial = true, searchVal = meterSearchQuery) => {
       if (isInitial) {
@@ -243,7 +241,6 @@ export function useAdminMeters() {
     [pickerMeterOffset, pickerMetersList.length, meterSearchQuery]
   );
 
-  // دالة تحميل المزيد للعدادات داخل الـ Picker (Infinite Scroll)
   const loadMoreMeters = useCallback(() => {
     if (isLoadingMorePickerMeters || !pickerMeterHasMore) return;
     fetchMetersForPicker(false, meterSearchQuery);
@@ -254,7 +251,6 @@ export function useAdminMeters() {
     meterSearchQuery,
   ]);
 
-  // دالة إطلاق البحث الموجه للعدادات بداخل الـ Picker
   const handleMeterSearchSubmit = () => {
     fetchMetersForPicker(true, meterSearchQuery);
   };
@@ -264,7 +260,6 @@ export function useAdminMeters() {
     fetchMeters(true, searchQuery);
   }, [fetchMeters, searchQuery]);
 
-  // 4. تفعيل الجلب والمسح التلقائي للـ Pickers عند تصفح التبويب الثاني
   useEffect(() => {
     if (activeTab === "association") {
       fetchUsersForPicker(true, "");
@@ -374,6 +369,27 @@ export function useAdminMeters() {
     }
   };
 
+  // 9. خدمة إلغاء إسناد العداد (فصم العلاقة فورا وتحديث القائمة حياً)
+  const handleUnassignMeter = async () => {
+    if (!associationToUnassign) return;
+    setIsUnassigning(true);
+    try {
+      const response = await apiClient.post("/api/admin/meters/unassign/", {
+        userId: associationToUnassign.userId,
+        meterId: associationToUnassign.meterId,
+      });
+      if (response.data.status === "success") {
+        setIsUnassignVisible(false);
+        setAssociationToUnassign(null);
+        fetchMeters(true, searchQuery); // تحديث فوري وسريع لقائمة العدادات التبويب الأول
+      }
+    } catch (err) {
+      console.log("تعذر إلغاء الإسناد:", err);
+    } finally {
+      setIsUnassigning(false);
+    }
+  };
+
   return {
     meters,
     activeTab,
@@ -386,7 +402,7 @@ export function useAdminMeters() {
     searchQuery,
     setSearchQuery,
     isSearching,
-    fetchMeters, // تصدير التابع يدوياً للبحث بالتبويب الأول
+    fetchMeters,
     loadMore,
     hasMore,
     // إنشاء
@@ -440,12 +456,18 @@ export function useAdminMeters() {
     loadMoreMeters,
     pickerMeterHasMore,
     pickerMetersList,
-    // إسناد
+    // إسناد وإلغاء الإسناد الفوري
     assignmentAlias,
     setAssignmentAlias,
     isAssigning,
     assignError,
     assignSuccess,
     handleAssignMeter,
+    isUnassignVisible,
+    setIsUnassignVisible,
+    associationToUnassign,
+    setAssociationToUnassign,
+    isUnassigning,
+    handleUnassignMeter,
   };
 }

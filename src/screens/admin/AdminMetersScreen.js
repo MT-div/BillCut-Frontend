@@ -87,6 +87,12 @@ export default function AdminMetersScreen() {
     assignError,
     assignSuccess,
     handleAssignMeter,
+    isUnassignVisible,
+    setIsUnassignVisible,
+    associationToUnassign,
+    setAssociationToUnassign,
+    isUnassigning,
+    handleUnassignMeter,
   } = useAdminMeters();
 
   const renderMeterItem = ({ item }) => {
@@ -98,6 +104,43 @@ export default function AdminMetersScreen() {
           تاريخ التسجيل:{" "}
           {new Date(item.registerDate).toLocaleDateString("ar-SY")}
         </Text>
+
+        {/* عرض المشتركين المرتبطين بهذا العداد بجمالية كاملة تحت معطياته */}
+        <View style={styles.associatedUsersBox}>
+          <Text style={styles.associatedUsersTitle}>
+            المشتركون المرتبطون بهذا الجهاز:
+          </Text>
+          {item.associatedUsers && item.associatedUsers.length > 0 ? (
+            item.associatedUsers.map((user) => (
+              <View
+                key={`assoc-${user.preferenceId}`}
+                style={styles.assocUserRow}
+              >
+                <Text style={styles.assocUserName}>
+                  👤 {user.fullName} ({user.alias})
+                </Text>
+                {/* زر إلغاء الإسناد الفوري تحت العداد مع تصفير الكاش */}
+                <TouchableOpacity
+                  style={styles.unassignMiniBtn}
+                  onPress={() => {
+                    setAssociationToUnassign({
+                      userId: user.userId,
+                      meterId: item.meterId,
+                      userName: user.fullName,
+                    });
+                    setIsUnassignVisible(true);
+                  }}
+                >
+                  <Text style={styles.unassignMiniBtnText}>إلغاء الربط</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noAssocText}>
+              لا يوجد مستخدمون مرتبطون بهذا العداد حالياً.
+            </Text>
+          )}
+        </View>
 
         <View style={styles.actionsRow}>
           <TouchableOpacity
@@ -140,7 +183,6 @@ export default function AdminMetersScreen() {
     );
   };
 
-  // مكوّن الـ Footer المخصص للمشتركين بداخل الـ Picker
   const renderUserPickerFooter = () => {
     if (!isLoadingMoreUsers) return null;
     return (
@@ -151,7 +193,6 @@ export default function AdminMetersScreen() {
     );
   };
 
-  // مكوّن الـ Footer المخصص للعدادات بداخل الـ Picker
   const renderMeterPickerFooter = () => {
     if (!isLoadingMorePickerMeters) return null;
     return (
@@ -302,7 +343,7 @@ export default function AdminMetersScreen() {
             >
               <Text style={styles.pickerSelectorText}>
                 {selectedUserForAssign
-                  ? `👤 ${selectedUserForAssign.fullName} (رقم الهاتف: ${selectedUserForAssign.phoneNumber})`
+                  ? `👤 ${selectedUserForAssign.fullName} (الهاتف: ${selectedUserForAssign.phoneNumber})`
                   : "اختر المشترك من هنا..."}
               </Text>
             </TouchableOpacity>
@@ -516,7 +557,7 @@ export default function AdminMetersScreen() {
             <View style={styles.searchRow}>
               <View style={styles.searchInputContainer}>
                 <CustomInput
-                  placeholder="اكتب اسم المشترك أو هاتفه..."
+                  placeholder="ابحث بالاسم أو رقم الهاتف..."
                   value={userSearchQuery}
                   onChangeText={setUserSearchQuery}
                 />
@@ -558,7 +599,6 @@ export default function AdminMetersScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-              // # تفعيل التصفح والتحميل اللانهائي (Infinite Scroll) لـ الـ Picker المخصص
               onEndReached={loadMoreUsers}
               onEndReachedThreshold={0.2}
               ListFooterComponent={renderUserPickerFooter}
@@ -592,7 +632,7 @@ export default function AdminMetersScreen() {
             <View style={styles.searchRow}>
               <View style={styles.searchInputContainer}>
                 <CustomInput
-                  placeholder="اكتب معرّف العداد للبحث..."
+                  placeholder="ابحث بالمعرّف للبحث..."
                   value={meterSearchQuery}
                   onChangeText={setMeterSearchQuery}
                 />
@@ -636,7 +676,6 @@ export default function AdminMetersScreen() {
                   </Text>
                 </TouchableOpacity>
               )}
-              //  # تفعيل التصفح والتحميل اللانهائي (Infinite Scroll) لـ الـ Picker المخصص
               onEndReached={loadMoreMeters}
               onEndReachedThreshold={0.2}
               ListFooterComponent={renderMeterPickerFooter}
@@ -651,6 +690,63 @@ export default function AdminMetersScreen() {
               onPress={() => setIsMeterPickerVisible(false)}
               color={theme.colors.border}
             />
+          </View>
+        </View>
+      </Modal>
+
+      {/* ==================== و. نافذة تأكيد إلغاء الإسناد الفوري من التبويب الأول ==================== */}
+      <Modal
+        visible={isUnassignVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsUnassignVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalContent,
+              { borderColor: theme.colors.errorText },
+            ]}
+          >
+            <Text
+              style={[styles.modalTitle, { color: theme.colors.errorText }]}
+            >
+              تأكيد إلغاء إسناد العداد
+            </Text>
+            <Text style={styles.warningText}>
+              تنبيه: سيؤدي إلغاء إسناد هذا العداد عن المشترك (
+              {associationToUnassign?.userName}) لحظر حسابه من تصفح قراءات هذا
+              العداد وميزانيته تماماً، هل تؤكد إلغاء الربط؟
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.errorText },
+                ]}
+                onPress={handleUnassignMeter}
+                disabled={isUnassigning}
+              >
+                {isUnassigning ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnText}>تأكيد إلغاء الربط</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.border },
+                ]}
+                onPress={() => setIsUnassignVisible(false)}
+              >
+                <Text
+                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+                >
+                  إلغاء
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -809,7 +905,6 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     lineHeight: 16,
     marginBottom: theme.spacing.md,
-    textAlign: "right",
   },
   modalOverlay: {
     flex: 1,
@@ -919,6 +1014,52 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     textAlign: "center",
     marginVertical: theme.spacing.md,
+    fontWeight: "600",
+  },
+  // تنسيقات ممتازة لإدراج قائمة المشتركين الفعالة تحت العداد بكعب منسق للـ RTL العربي
+  associatedUsersBox: {
+    marginTop: theme.spacing.sm,
+    paddingTop: theme.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F4F8",
+    width: "100%",
+  },
+  associatedUsersTitle: {
+    fontSize: 11.5,
+    fontWeight: "bold",
+    color: theme.colors.primary,
+    marginBottom: 6,
+  },
+  assocUserRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: "#FAFAFA",
+    width: "100%",
+  },
+  assocUserName: {
+    fontSize: 12.5,
+    color: theme.colors.text,
+    fontWeight: "bold",
+  },
+  unassignMiniBtn: {
+    backgroundColor: "#FDEDEC",
+    borderWidth: 1,
+    borderColor: theme.colors.errorText,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  unassignMiniBtnText: {
+    color: theme.colors.errorText,
+    fontSize: 9.5,
+    fontWeight: "bold",
+  },
+  noAssocText: {
+    fontSize: 11,
+    color: theme.colors.subtext,
     fontWeight: "600",
   },
 });
