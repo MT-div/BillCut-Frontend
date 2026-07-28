@@ -17,6 +17,7 @@ import AnalyticsScreen from "../screens/AnalyticsScreen";
 
 // استيراد شاشات مدير النظام الحقيقية
 import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
+import AdminUsersScreen from "../screens/admin/AdminUsersScreen";
 
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
@@ -45,11 +46,7 @@ const MockSettings = () => (
 );
 
 // شاشات الأدمن المؤقتة لحين برمجتها
-const MockAdminUsers = () => (
-  <View style={styles.center}>
-    <Text style={styles.title}>إدارة وحوكمة حسابات المستخدمين (CRUD)</Text>
-  </View>
-);
+
 const MockAdminMeters = () => (
   <View style={styles.center}>
     <Text style={styles.title}>إدارة وحوكمة العدادات وإسناد الصلاحيات</Text>
@@ -136,7 +133,7 @@ const AdminTabNavigator = () => (
     />
     <Tab.Screen
       name="المستخدمين"
-      component={MockAdminUsers}
+      component={AdminUsersScreen}
       options={{ title: "حوكمة المشتركين" }}
     />
     <Tab.Screen
