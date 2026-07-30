@@ -7,9 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 
-// استيراد المكونات المشتركة والثيم
 import CustomCard from "../../components/CustomCard";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
@@ -28,7 +29,6 @@ export default function AdminTariffScreen() {
     error,
     success,
     onRefresh,
-    // حقول التاريخ الثلاثية المضافة
     year,
     setYear,
     month,
@@ -114,7 +114,6 @@ export default function AdminTariffScreen() {
             ))}
         </View>
 
-        {/* زر حذف التعرفة المستقبلية جاهز ومدمج برمجياً لحذف كامل التعرفة سحابياً عند نقرة واحدة */}
         {isFuture && (
           <TouchableOpacity
             style={styles.deleteTariffBtn}
@@ -141,213 +140,215 @@ export default function AdminTariffScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <CustomAlert type="error" message={error} />
-      <CustomAlert type="success" message={success} />
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        <CustomAlert type="error" message={error} />
+        <CustomAlert type="success" message={success} />
 
-      {/* أزرار تبويب النظام المدمجة (Segmented Tabs) */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "view" && styles.activeTabButton,
-          ]}
-          onPress={() => setActiveTab("view")}
-        >
-          <Text
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              activeTab === "view" && styles.activeTabText,
+              styles.tabButton,
+              activeTab === "view" && styles.activeTabButton,
             ]}
+            onPress={() => setActiveTab("view")}
           >
-            استعراض التعرفات النشطة والمستقبلية
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "create" && styles.activeTabButton,
-          ]}
-          onPress={() => setActiveTab("create")}
-        >
-          <Text
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "view" && styles.activeTabText,
+              ]}
+            >
+              استعراض التعرفات النشطة والمستقبلية
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[
-              styles.tabText,
-              activeTab === "create" && styles.activeTabText,
+              styles.tabButton,
+              activeTab === "create" && styles.activeTabButton,
             ]}
+            onPress={() => setActiveTab("create")}
           >
-            تحديد وإضافة تعرفة جديدة
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ==================== أولاً: محتوى التبويب الأول (استعراض التعرفات) ==================== */}
-      {activeTab === "view" ? (
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
-              colors={[theme.colors.primary]}
-            />
-          }
-        >
-          {tariffs && tariffs.length > 0 ? (
-            tariffs.map((item) => renderTariffItem(item))
-          ) : (
-            <View style={styles.emptyCenter}>
-              <Text style={styles.emptyText}>سجل التعرفات فارغ حالياً.</Text>
-            </View>
-          )}
-        </ScrollView>
-      ) : (
-        // ==================== ثانياً: محتوى التبويب الثاني (تصميم الجدول الأفقي الرشيق) ====================
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {/* الكارت 1: إدخال التاريخ بالصيغة الثلاثية الأفقية الاحترافية والمنسقة لـ الـ RTL */}
-          <CustomCard style={styles.sectionCard}>
-            <Text style={styles.cardTitle}>
-              تاريخ سريان ونفاذ الأسعار الجديدة
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === "create" && styles.activeTabText,
+              ]}
+            >
+              تحديد وإضافة تعرفة جديدة
             </Text>
-            <Text style={styles.subLabel}>
-              أدخل تاريخ بدء سريان التعرفة بالتفصيل (يجب أن تفرز كالسنة، الشهر،
-              اليوم):
-            </Text>
+          </TouchableOpacity>
+        </View>
 
-            <View style={styles.dateInputRow}>
-              <View style={styles.dateInputContainer}>
-                <CustomInput
-                  label="السنة (YYYY)"
-                  placeholder="2026"
-                  value={year}
-                  onChangeText={setYear}
-                  keyboardType="numeric"
-                />
+        {activeTab === "view" ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={onRefresh}
+                colors={[theme.colors.primary]}
+              />
+            }
+          >
+            {tariffs && tariffs.length > 0 ? (
+              tariffs.map((item) => renderTariffItem(item))
+            ) : (
+              <View style={styles.emptyCenter}>
+                <Text style={styles.emptyText}>سجل التعرفات فارغ حالياً.</Text>
               </View>
-              <Text style={styles.dateSeparator}>-</Text>
-              <View style={styles.dateInputContainer}>
-                <CustomInput
-                  label="الشهر (MM)"
-                  placeholder="08"
-                  value={month}
-                  onChangeText={setMonth}
-                  keyboardType="numeric"
-                />
-              </View>
-              <Text style={styles.dateSeparator}>-</Text>
-              <View style={styles.dateInputContainer}>
-                <CustomInput
-                  label="اليوم (DD)"
-                  placeholder="01"
-                  value={day}
-                  onChangeText={setDay}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-          </CustomCard>
-
-          <CustomCard style={styles.sectionCard}>
-            <Text style={styles.cardTitle}>
-              بناء وهيكلة شرائح التعرفة الجديدة
-            </Text>
-            <Text style={styles.subLabel}>
-              الحد الأدنى لكل شريحة يُحسب تلقائياً من الحد الأعلى للشريحة التي
-              قبلها. الشريحة الأخيرة تُعتبر دائماً مفتوحة الحد الأعلى؛ أي قيمة
-              تكتبها في حقلها سيتم تجاهلها عند إصدار التعرفة (وسيظهر لك تنبيه
-              بذلك).
-            </Text>
-
-            <View style={styles.gridHeaderRow}>
-              <Text style={[styles.gridHeaderCell, { width: "12%" }]}>
-                شريحة
+            )}
+          </ScrollView>
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <CustomCard style={styles.sectionCard}>
+              <Text style={styles.cardTitle}>
+                تاريخ سريان ونفاذ الأسعار الجديدة
               </Text>
-              <Text style={[styles.gridHeaderCell, { width: "26%" }]}>
-                حد أدنى
+              <Text style={styles.subLabel}>
+                أدخل تاريخ بدء سريان التعرفة بالتفصيل (السنة، الشهر، اليوم):
               </Text>
-              <Text style={[styles.gridHeaderCell, { width: "28%" }]}>
-                حد أعلى
-              </Text>
-              <Text style={[styles.gridHeaderCell, { width: "26%" }]}>
-                سعر (ل.س)
-              </Text>
-            </View>
 
-            {tiers.map((item, index) => (
-              <View
-                key={`grid-row-${item.tierNumber}`}
-                style={styles.gridBodyRow}
-              >
-                <View style={[styles.gridCellWrap, { width: "12%" }]}>
-                  <Text style={styles.gridCellText}>{item.tierNumber}</Text>
-                </View>
-
-                <View style={[styles.gridDisabledInput, { width: "26%" }]}>
-                  <Text style={styles.gridDisabledText}>{item.startKWh}</Text>
-                </View>
-
-                <View style={styles.gridInputWrap}>
+              <View style={styles.dateInputRow}>
+                <View style={styles.dateInputContainer}>
                   <CustomInput
-                    placeholder="مفتوح"
-                    value={item.endKWh}
-                    onChangeText={(val) =>
-                      updateTierField(index, "endKWh", val)
-                    }
+                    label="السنة (YYYY)"
+                    placeholder="2026"
+                    value={year}
+                    onChangeText={setYear}
                     keyboardType="numeric"
                   />
                 </View>
 
-                <View style={styles.gridInputWrap}>
+                <Text style={styles.dateSeparator}>-</Text>
+
+                <View style={styles.dateInputContainer}>
                   <CustomInput
-                    placeholder="600"
-                    value={item.pricePerKWh}
-                    onChangeText={(val) =>
-                      updateTierField(index, "pricePerKWh", val)
-                    }
+                    label="الشهر (MM)"
+                    placeholder="08"
+                    value={month}
+                    onChangeText={setMonth}
+                    keyboardType="numeric"
+                  />
+                </View>
+
+                <Text style={styles.dateSeparator}>-</Text>
+
+                <View style={styles.dateInputContainer}>
+                  <CustomInput
+                    label="اليوم (DD)"
+                    placeholder="01"
+                    value={day}
+                    onChangeText={setDay}
                     keyboardType="numeric"
                   />
                 </View>
               </View>
-            ))}
+            </CustomCard>
 
-            <View style={styles.row}>
-              <TouchableOpacity
-                style={[
-                  styles.controlBtn,
-                  { backgroundColor: theme.colors.secondary },
-                ]}
-                onPress={addTier}
-              >
-                <Text style={styles.controlBtnText}>➕ إضافة شريحة</Text>
-              </TouchableOpacity>
-              {tiers.length > 1 && (
+            <CustomCard style={styles.sectionCard}>
+              <Text style={styles.cardTitle}>
+                بناء وهيكلة شرائح التعرفة الجديدة
+              </Text>
+              <Text style={styles.subLabel}>
+                الحد الأدنى لكل شريحة يُحسب تلقائياً من الحد الأعلى للشريحة التي
+                قبلها. الشريحة الأخيرة تُعتبر دائماً مفتوحة الحد الأعلى.
+              </Text>
+
+              <View style={styles.gridHeaderRow}>
+                <Text style={[styles.gridHeaderCell, { width: "12%" }]}>
+                  شريحة
+                </Text>
+                <Text style={[styles.gridHeaderCell, { width: "26%" }]}>
+                  حد أدنى
+                </Text>
+                <Text style={[styles.gridHeaderCell, { width: "28%" }]}>
+                  حد أعلى
+                </Text>
+                <Text style={[styles.gridHeaderCell, { width: "26%" }]}>
+                  سعر (ل.س)
+                </Text>
+              </View>
+
+              {tiers.map((item, index) => (
+                <View
+                  key={`grid-row-${item.tierNumber}`}
+                  style={styles.gridBodyRow}
+                >
+                  <View style={[styles.gridCellWrap, { width: "12%" }]}>
+                    <Text style={styles.gridCellText}>{item.tierNumber}</Text>
+                  </View>
+
+                  <View style={[styles.gridDisabledInput, { width: "26%" }]}>
+                    <Text style={styles.gridDisabledText}>{item.startKWh}</Text>
+                  </View>
+
+                  <View style={styles.gridInputWrap}>
+                    <CustomInput
+                      placeholder="مفتوح"
+                      value={item.endKWh}
+                      onChangeText={(val) =>
+                        updateTierField(index, "endKWh", val)
+                      }
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  <View style={styles.gridInputWrap}>
+                    <CustomInput
+                      placeholder="600"
+                      value={item.pricePerKWh}
+                      onChangeText={(val) =>
+                        updateTierField(index, "pricePerKWh", val)
+                      }
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.row}>
                 <TouchableOpacity
                   style={[
                     styles.controlBtn,
-                    { backgroundColor: theme.colors.errorText },
+                    { backgroundColor: theme.colors.secondary },
                   ]}
-                  onPress={removeLastTier}
+                  onPress={addTier}
                 >
-                  <Text style={styles.controlBtnText}>➖ حذف الأخيرة</Text>
+                  <Text style={styles.controlBtnText}>➕ إضافة شريحة</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          </CustomCard>
+                {tiers.length > 1 && (
+                  <TouchableOpacity
+                    style={[
+                      styles.controlBtn,
+                      { backgroundColor: theme.colors.errorText },
+                    ]}
+                    onPress={removeLastTier}
+                  >
+                    <Text style={styles.controlBtnText}>➖ حذف الأخيرة</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </CustomCard>
 
-          <CustomButton
-            title={
-              isSaving
-                ? "جاري تفعيل وحفظ التعرفة..."
-                : "تنشيط وإصدار التعرفة الكهربائية الجديدة"
-            }
-            onPress={handleSaveTariff}
-            color={theme.colors.primary}
-            disabled={isSaving}
-          />
-        </ScrollView>
-      )}
-    </View>
+            <CustomButton
+              title={
+                isSaving
+                  ? "جاري تفعيل وحفظ التعرفة..."
+                  : "تنشيط وإصدار التعرفة الكهربائية الجديدة"
+              }
+              onPress={handleSaveTariff}
+              color={theme.colors.primary}
+              disabled={isSaving}
+            />
+          </ScrollView>
+        )}
+      </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -418,7 +419,6 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     lineHeight: 16,
     marginBottom: theme.spacing.md,
-    textAlign: "right",
   },
   sectionCard: {
     marginBottom: theme.spacing.md,
@@ -450,7 +450,6 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     fontWeight: "600",
     marginBottom: theme.spacing.md,
-    textAlign: "right",
   },
   tiersTable: {
     width: "100%",
@@ -515,7 +514,6 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
     textAlign: "center",
   },
-  // صف الشريحة: كل الخلايا الآن بنفس الارتفاع الثابت ومحاذاة مركزية موحدة، بلا هوامش سالبة
   gridBodyRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -569,7 +567,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-  // تصميم حقول التاريخ الثلاثية الأفقية التفاعلية المتأصلة لـ RTL
   dateInputRow: {
     flexDirection: "row",
     justifyContent: "center",
@@ -578,7 +575,6 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.xs,
   },
   dateInputContainer: {
-    // توزيع الحقول بنسب متناسقة وعريضة لتتناسب مع مدخلات السنة الكبرى
     width: "28%",
   },
   dateSeparator: {
@@ -586,6 +582,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: theme.colors.border,
     marginHorizontal: theme.spacing.sm,
-    marginTop: 10, // موازنة ميكانيكية للشرطة الفاصلة بين الحقول الثلاثة
+    marginTop: 10,
   },
 });

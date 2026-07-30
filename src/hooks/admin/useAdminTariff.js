@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Alert } from "react-native";
 import apiClient from "../../api/apiClient";
+import { adminMapper } from "../../api/mappers/adminMapper";
 
 export function useAdminTariff() {
-  const [activeTab, setActiveTab] = useState("view"); // 'view' أو 'create'
+  const [activeTab, setActiveTab] = useState("view");
   const [tariffs, setTariffs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -11,13 +12,12 @@ export function useAdminTariff() {
   const [error, setError] = useState("");
   const [success, setSuccessMsg] = useState("");
 
-  // أ. حالات كارت التاريخ المحدثة لثلاثة حقول مستقلة (سنة، شهر، يوم)
+  // حقول إدخال التاريخ
   const [year, setYear] = useState("");
   const [month, setMonth] = useState("");
   const [day, setDay] = useState("");
 
   // مصفوفة الشرائح الديناميكية
-  // شريحة البداية: حد أدنى = 0 تلقائياً، وحد أعلى وسعر فارغان وقابلان للتعديل
   const [tiers, setTiers] = useState([
     { tierNumber: 1, startKWh: 0, endKWh: "", pricePerKWh: "" },
   ]);
@@ -27,10 +27,15 @@ export function useAdminTariff() {
     try {
       const response = await apiClient.get("/api/admin/tariff/update/");
       if (response.data.status === "success") {
-        setTariffs(response.data.data);
+        const rawResults = response.data.data || [];
+        const mappedTariffs = adminMapper.toTariffListViewModel(rawResults);
+        setTariffs(mappedTariffs);
       }
     } catch (err) {
-      setError("تعذر استرجاع سجلات التعرفات من السيرفر.");
+      const errMsg =
+        err.response?.data?.message ||
+        "تعذر استرجاع سجلات التعرفات من السيرفر.";
+      setError(errMsg);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -46,8 +51,6 @@ export function useAdminTariff() {
     fetchTariffs();
   }, [fetchTariffs]);
 
-  // إضافة شريحة جديدة: يشترط أن يكون الحد الأعلى للشريحة السابقة مكتوباً وصحيحاً
-  // بداية الشريحة الجديدة = نهاية الشريحة السابقة تلقائياً
   const addTier = () => {
     setError("");
     setSuccessMsg("");
@@ -105,8 +108,6 @@ export function useAdminTariff() {
     });
   };
 
-  // يبني مصفوفة الشرائح النهائية الجاهزة للإرسال للسيرفر
-  // clearLastEnd: عندما يوافق المستخدم على تفريغ الحد الأعلى للشريحة الأخيرة
   const buildFormattedTiers = (clearLastEnd) =>
     tiers.map((t, idx) => {
       const isLast = idx === tiers.length - 1;
@@ -124,7 +125,6 @@ export function useAdminTariff() {
       };
     });
 
-  // التنفيذ الفعلي لعملية الحفظ (استدعاء الـ API)
   const proceedSaveTariff = async (formattedDateStr, formattedTiers) => {
     setIsSaving(true);
     try {
@@ -134,8 +134,7 @@ export function useAdminTariff() {
       });
 
       if (response.data.status === "success") {
-        setSuccessMsg(response.data.message);
-        // تصفير الحقول للبدء من جديد بنظافة
+        setSuccessMsg(response.data.message || "تم حفظ التعرفة بنجاح.");
         setYear("");
         setMonth("");
         setDay("");
@@ -149,13 +148,10 @@ export function useAdminTariff() {
     }
   };
 
-  // خدمة حفظ وإصدار التعرفة: تحقق من التاريخ والشرائح، ثم تنبيه المستخدم
-  // إذا كان الحد الأعلى للشريحة الأخيرة معبأً (سيتم اعتباره مفتوحاً دوماً)
   const handleSaveTariff = () => {
     setError("");
     setSuccessMsg("");
 
-    // 1. التحقق من اكتمال إدخال حقول التاريخ الثلاثة
     if (!year.trim() || !month.trim() || !day.trim()) {
       setError("يرجى إدخال تاريخ السريان بالكامل (السنة، الشهر، واليوم).");
       return;
@@ -180,12 +176,10 @@ export function useAdminTariff() {
       return;
     }
 
-    // صياغة التاريخ بصيغة ISO القياسية (YYYY-MM-DD)
     const formattedDateStr = `${y}-${m.toString().padStart(2, "0")}-${d
       .toString()
       .padStart(2, "0")}`;
 
-    // 2. التحقق من صحة كل الشرائح (باستثناء الحد الأعلى للشريحة الأخيرة فهو اختياري دوماً)
     for (let i = 0; i < tiers.length; i++) {
       const t = tiers[i];
       const isLast = i === tiers.length - 1;
@@ -214,7 +208,6 @@ export function useAdminTariff() {
       lastTier.endKWh !== null &&
       lastTier.endKWh !== undefined;
 
-    // 3. الشريحة الأخيرة تعتبر دائماً مفتوحة الحد الأعلى
     if (lastEndFilled) {
       Alert.alert(
         "تنبيه",
@@ -265,14 +258,12 @@ export function useAdminTariff() {
     error,
     success,
     onRefresh,
-    // إدخال وتجميع التاريخ الثلاثي
     year,
     setYear,
     month,
     setMonth,
     day,
     setDay,
-    // إدخال وتجميع الشرائح
     tiers,
     addTier,
     removeLastTier,
