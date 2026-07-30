@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect } from "react";
 import * as SecureStore from "expo-secure-store";
 import axios from "axios";
-
+import apiClient from "../api/apiClient";
 export const AuthContext = createContext();
 
 //   : استبدل الرابط بـ IP حاسبك المحلي عند تجربة التطبيق على هاتف حقيقي متصل بنفس الشبكة
