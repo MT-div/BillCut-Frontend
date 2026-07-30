@@ -68,16 +68,53 @@ export const AuthProvider = ({ children }) => {
     try {
       const accessToken = await SecureStore.getItemAsync("access_token");
       const savedUserData = await SecureStore.getItemAsync("user_data");
+
       if (accessToken && savedUserData) {
+        // 1. سرعة الفتح المباشر (Instant UI Load) من الذاكرة المشفرة
         const parsedUser = JSON.parse(savedUserData);
         setUserToken(accessToken);
         setUser(parsedUser);
         setViewMode(parsedUser.role === "ADMIN" ? "admin" : "resident");
+
+        // 2. التحقق والمزامنة الصامتة الاحترافية عبر apiClient القياسي
+        try {
+          const res = await apiClient.get("/api/auth/me/");
+          if (res.data.status === "success") {
+            const freshUserData = res.data.user;
+            setUser(freshUserData);
+
+            // تصحيح فوري وديناميكي لدور المستخدم ووضع العرض في حال تم تعديله سحابياً!
+            setViewMode(freshUserData.role === "ADMIN" ? "admin" : "resident");
+
+            // حفظ التحديث الجديد في الذاكرة المشفرة للهاتف
+            await SecureStore.setItemAsync(
+              "user_data",
+              JSON.stringify(freshUserData)
+            );
+          }
+        } catch (syncErr) {
+          // حزام أمان أمني: إذا تم إلغاء حساب المستخدم أو طرده من السيرفر (401/403)، يتم طرده فوراً محلياً
+          if (
+            syncErr.response?.status === 401 ||
+            syncErr.response?.status === 403
+          ) {
+            console.log(
+              "الجلسة ملغاة أو الحساب محظور سحابياً، جاري تسجيل الخروج القسري..."
+            );
+            await logout();
+            return;
+          }
+          console.log(
+            "تعذر التحديث الصامت للجلسة (خطأ شبكة)، الاعتماد على الذاكرة المحلية مؤقتاً:",
+            syncErr
+          );
+        }
       }
     } catch (e) {
-      console.log("فشل قراءة الذاكرة المشفرة:", e);
+      console.log("فشل قراءة الذاكرة المشفرة للهاتف:", e);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
   // دالة مخصصة ومحترفة لتحديث ومزامنة بيانات المستخدم والعدادات محلياً في ذاكرة الهاتف عند أي تعديل سحابي
   const updateUserData = async (updatedMeters, defaultMeterId) => {
