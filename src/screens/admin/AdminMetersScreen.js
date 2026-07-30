@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -9,16 +9,18 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 
-// استيراد المكونات المشتركة والثيم
 import CustomCard from "../../components/CustomCard";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert";
+import AlertBanner from "../../components/AlertBanner";
+
 import { useAdminMeters } from "../../hooks/admin/useAdminMeters";
 import { theme } from "../../theme/theme";
-import AlertBanner from "../../components/AlertBanner";
 
 export default function AdminMetersScreen() {
   const {
@@ -35,7 +37,6 @@ export default function AdminMetersScreen() {
     isSearching,
     fetchMeters,
     loadMore,
-    hasMore,
     isCreateVisible,
     setIsCreateVisible,
     newMeterId,
@@ -67,7 +68,6 @@ export default function AdminMetersScreen() {
     handleUserSearchSubmit,
     isLoadingMoreUsers,
     loadMoreUsers,
-    userHasMore,
     usersList,
     isMeterPickerVisible,
     setIsMeterPickerVisible,
@@ -79,7 +79,6 @@ export default function AdminMetersScreen() {
     handleMeterSearchSubmit,
     isLoadingMorePickerMeters,
     loadMoreMeters,
-    pickerMeterHasMore,
     pickerMetersList,
     assignmentAlias,
     setAssignmentAlias,
@@ -95,17 +94,13 @@ export default function AdminMetersScreen() {
     handleUnassignMeter,
   } = useAdminMeters();
 
-  const renderMeterItem = ({ item }) => {
+  const renderMeterItem = useCallback(({ item }) => {
     return (
       <CustomCard style={styles.meterCard}>
         <Text style={styles.meterTitle}>معرّف العداد (UUID)</Text>
         <Text style={styles.meterIdText}>{item.meterId}</Text>
-        <Text style={styles.dateText}>
-          تاريخ التسجيل:{" "}
-          {new Date(item.registerDate).toLocaleDateString("ar-SY")}
-        </Text>
+        <Text style={styles.dateText}>تاريخ التسجيل: {item.registerDate}</Text>
 
-        {/* عرض المشتركين المرتبطين بهذا العداد بجمالية كاملة تحت معطياته */}
         <View style={styles.associatedUsersBox}>
           <Text style={styles.associatedUsersTitle}>
             المشتركون المرتبطون بهذا الجهاز:
@@ -119,7 +114,6 @@ export default function AdminMetersScreen() {
                 <Text style={styles.assocUserName}>
                   👤 {user.fullName} ({user.alias})
                 </Text>
-                {/* زر إلغاء الإسناد الفوري تحت العداد مع تصفير الكاش */}
                 <TouchableOpacity
                   style={styles.unassignMiniBtn}
                   onPress={() => {
@@ -171,7 +165,7 @@ export default function AdminMetersScreen() {
         </View>
       </CustomCard>
     );
-  };
+  }, []);
 
   const renderFooter = () => {
     if (!isLoadingMore) return null;
@@ -216,7 +210,6 @@ export default function AdminMetersScreen() {
     <View style={styles.container}>
       <AlertBanner type="error" message={error} />
 
-      {/* أزرار تبويب النظام المدمجة (Segmented Tabs) */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
@@ -252,7 +245,7 @@ export default function AdminMetersScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ==================== أولاً: محتوى التبويب الأول (Meters CRUD) ==================== */}
+      {/* TABS 1: METERS CRUD */}
       {activeTab === "meters" ? (
         <View style={{ flex: 1 }}>
           <View style={styles.headerBox}>
@@ -262,6 +255,8 @@ export default function AdminMetersScreen() {
                   placeholder="ابحث بمعرّف العداد..."
                   value={searchQuery}
                   onChangeText={setSearchQuery}
+                  autoCapitalize="none"
+                  autoCorrect={false}
                 />
               </View>
               <TouchableOpacity
@@ -293,9 +288,7 @@ export default function AdminMetersScreen() {
 
           <FlatList
             data={meters}
-            keyExtractor={(item, index) =>
-              item.meterId?.toString() || index.toString()
-            }
+            keyExtractor={(item) => String(item.meterId)}
             renderItem={renderMeterItem}
             contentContainerStyle={styles.listContent}
             refreshControl={
@@ -306,8 +299,12 @@ export default function AdminMetersScreen() {
               />
             }
             onEndReached={loadMore}
-            onEndReachedThreshold={0.2}
+            onEndReachedThreshold={0.3}
             ListFooterComponent={renderFooter}
+            removeClippedSubviews={true}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
             ListEmptyComponent={
               <View style={styles.emptyCenter}>
                 <Text style={styles.emptyText}>
@@ -321,7 +318,7 @@ export default function AdminMetersScreen() {
           />
         </View>
       ) : (
-        // ==================== ثانياً: محتوى التبويب الثاني (Meters Association & Searchable Pickers) ====================
+        /* TABS 2: METERS ASSIGNMENT */
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <CustomCard>
             <Text style={styles.cardTitle}>
@@ -335,7 +332,6 @@ export default function AdminMetersScreen() {
             <CustomAlert type="error" message={assignError} />
             <CustomAlert type="success" message={assignSuccess} />
 
-            {/* حقل اختيار المشترك القابل للبحث المتقدم عبر الـ Modal */}
             <Text style={styles.pickerLabel}>المشترك المستهدف</Text>
             <TouchableOpacity
               style={styles.pickerSelectorBtn}
@@ -348,7 +344,6 @@ export default function AdminMetersScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* حقل اختيار العداد القابل للبحث المتقدم عبر الـ Modal */}
             <Text style={styles.pickerLabel}>العداد المستهدف للربط</Text>
             <TouchableOpacity
               style={styles.pickerSelectorBtn}
@@ -385,106 +380,116 @@ export default function AdminMetersScreen() {
         </ScrollView>
       )}
 
-      {/* ==================== أ. نافذة إضافة عداد جديد (Create Modal) ==================== */}
+      {/* Modal 1: Create Meter */}
       <Modal
         visible={isCreateVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setIsCreateVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>تسجيل عداد فيزيائي جديد</Text>
-            <CustomAlert type="error" message={createError} />
-            <CustomInput
-              label="المعّرف الفيزيائي الفريد للعداد (UUID)"
-              placeholder="مثال: 11111111-1111-1111-1111-111111111111"
-              value={newMeterId}
-              onChangeText={setNewMeterId}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.secondary },
-                ]}
-                onPress={handleCreateMeter}
-                disabled={isCreating}
-              >
-                {isCreating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnText}>تسجيل العداد</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.border },
-                ]}
-                onPress={() => setIsCreateVisible(false)}
-              >
-                <Text
-                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>تسجيل عداد فيزيائي جديد</Text>
+              <CustomAlert type="error" message={createError} />
+              <CustomInput
+                label="المعّرف الفيزيائي الفريد للعداد (UUID)"
+                placeholder="مثال: 11111111-1111-1111-1111-111111111111"
+                value={newMeterId}
+                onChangeText={setNewMeterId}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.secondary },
+                  ]}
+                  onPress={handleCreateMeter}
+                  disabled={isCreating}
                 >
-                  إلغاء
-                </Text>
-              </TouchableOpacity>
+                  {isCreating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalBtnText}>تسجيل العداد</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.border },
+                  ]}
+                  onPress={() => setIsCreateVisible(false)}
+                >
+                  <Text
+                    style={[styles.modalBtnText, { color: theme.colors.text }]}
+                  >
+                    إلغاء
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      {/* ==================== ب. نافذة تعديل العداد (Edit Modal) ==================== */}
+      {/* Modal 2: Edit Meter */}
       <Modal
         visible={isEditVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setIsEditVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>تعديل معرّف العداد الفيزيائي</Text>
-            <CustomAlert type="error" message={editError} />
-            <CustomInput
-              label="المعرّف الفيزيائي الجديد (UUID)"
-              value={editMeterId}
-              onChangeText={setEditMeterId}
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                onPress={handleUpdateMeter}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnText}>حفظ التعديل</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.border },
-                ]}
-                onPress={() => setIsEditVisible(false)}
-              >
-                <Text
-                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                تعديل معرّف العداد الفيزيائي
+              </Text>
+              <CustomAlert type="error" message={editError} />
+              <CustomInput
+                label="المعرّف الفيزيائي الجديد (UUID)"
+                value={editMeterId}
+                onChangeText={setEditMeterId}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  onPress={handleUpdateMeter}
+                  disabled={isUpdating}
                 >
-                  إلغاء
-                </Text>
-              </TouchableOpacity>
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalBtnText}>حفظ التعديل</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.border },
+                  ]}
+                  onPress={() => setIsEditVisible(false)}
+                >
+                  <Text
+                    style={[styles.modalBtnText, { color: theme.colors.text }]}
+                  >
+                    إلغاء
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
-      {/* ==================== ج. تأكيد الحذف النهائي للعداد (Delete Confirmation) ==================== */}
+      {/* Modal 3: Delete Meter */}
       <Modal
         visible={isDeleteVisible}
         transparent
@@ -542,7 +547,7 @@ export default function AdminMetersScreen() {
         </View>
       </Modal>
 
-      {/* ==================== د. الـ Searchable Picker المنبثق لاختيار المشترك المرقّم سحابياً ==================== */}
+      {/* Modal 4: Picker User */}
       <Modal
         visible={isUserPickerVisible}
         transparent
@@ -552,8 +557,6 @@ export default function AdminMetersScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.pickerModalContent}>
             <Text style={styles.modalTitle}>ابحث واختر المشترك المستهدف</Text>
-
-            {/* مربع البحث والزر الموجه المخصص لتوفير اتصال السيرفر */}
             <View style={styles.searchRow}>
               <View style={styles.searchInputContainer}>
                 <CustomInput
@@ -584,7 +587,7 @@ export default function AdminMetersScreen() {
 
             <FlatList
               data={usersList}
-              keyExtractor={(item, index) => `user-picker-${item.id}-${index}`}
+              keyExtractor={(item) => `user-picker-${item.id}`}
               style={{ maxHeight: 220, marginVertical: theme.spacing.sm }}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -600,7 +603,7 @@ export default function AdminMetersScreen() {
                 </TouchableOpacity>
               )}
               onEndReached={loadMoreUsers}
-              onEndReachedThreshold={0.2}
+              onEndReachedThreshold={0.3}
               ListFooterComponent={renderUserPickerFooter}
               ListEmptyComponent={
                 <Text style={styles.pickerEmptyText}>
@@ -617,7 +620,7 @@ export default function AdminMetersScreen() {
         </View>
       </Modal>
 
-      {/* ==================== هـ. الـ Searchable Picker المنبثق لاختيار العداد المرقّم سحابياً ==================== */}
+      {/* Modal 5: Picker Meter */}
       <Modal
         visible={isMeterPickerVisible}
         transparent
@@ -627,8 +630,6 @@ export default function AdminMetersScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.pickerModalContent}>
             <Text style={styles.modalTitle}>ابحث واختر العداد المستهدف</Text>
-
-            {/* مربع البحث والزر الموجه المخصص لتوفير اتصال السيرفر */}
             <View style={styles.searchRow}>
               <View style={styles.searchInputContainer}>
                 <CustomInput
@@ -659,9 +660,7 @@ export default function AdminMetersScreen() {
 
             <FlatList
               data={pickerMetersList}
-              keyExtractor={(item, index) =>
-                `meter-picker-${item.meterId}-${index}`
-              }
+              keyExtractor={(item) => `meter-picker-${item.meterId}`}
               style={{ maxHeight: 220, marginVertical: theme.spacing.sm }}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -677,7 +676,7 @@ export default function AdminMetersScreen() {
                 </TouchableOpacity>
               )}
               onEndReached={loadMoreMeters}
-              onEndReachedThreshold={0.2}
+              onEndReachedThreshold={0.3}
               ListFooterComponent={renderMeterPickerFooter}
               ListEmptyComponent={
                 <Text style={styles.pickerEmptyText}>
@@ -694,7 +693,7 @@ export default function AdminMetersScreen() {
         </View>
       </Modal>
 
-      {/* ==================== و. نافذة تأكيد إلغاء الإسناد الفوري من التبويب الأول ==================== */}
+      {/* Modal 6: Unassign Meter Confirmation */}
       <Modal
         visible={isUnassignVisible}
         transparent
@@ -1016,7 +1015,6 @@ const styles = StyleSheet.create({
     marginVertical: theme.spacing.md,
     fontWeight: "600",
   },
-  // تنسيقات ممتازة لإدراج قائمة المشتركين الفعالة تحت العداد بكعب منسق للـ RTL العربي
   associatedUsersBox: {
     marginTop: theme.spacing.sm,
     paddingTop: theme.spacing.sm,

@@ -1,18 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../../api/apiClient";
+import { adminMapper } from "../../api/mappers/adminMapper";
 
 export function useAdminMeters() {
   const [meters, setMeters] = useState([]);
-  const [activeTab, setActiveTab] = useState("meters"); // 'meters' أو 'association'
+  const [activeTab, setActiveTab] = useState("meters");
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
-  // ============================================================
-  // أ. تفضيلات القائمة الأولى (التبويب الأول: العدادات الفعالة CRUD)
-  // ============================================================
+  // حالات القائمة الأولى CRUD
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [offset, setOffset] = useState(0);
@@ -34,9 +33,7 @@ export function useAdminMeters() {
   const [meterToDelete, setMeterToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // ============================================================
-  // ب. تفضيلات الـ Picker الأول (اختيار المشترك المرقّم سحابياً)
-  // ============================================================
+  // Picker 1: المشتركين
   const [usersList, setUsersList] = useState([]);
   const [isUserPickerVisible, setIsUserPickerVisible] = useState(false);
   const [selectedUserForAssign, setSelectedUserForAssign] = useState(null);
@@ -46,9 +43,7 @@ export function useAdminMeters() {
   const [userOffset, setUserOffset] = useState(0);
   const [userHasMore, setUserHasMore] = useState(true);
 
-  // ============================================================
-  // ج. تفضيلات الـ Picker الثاني (اختيار العداد المرقّم سحابياً)
-  // ============================================================
+  // Picker 2: العدادات
   const [pickerMetersList, setPickerMetersList] = useState([]);
   const [isMeterPickerVisible, setIsMeterPickerVisible] = useState(false);
   const [selectedMeterForAssign, setSelectedMeterForAssign] = useState(null);
@@ -59,18 +54,18 @@ export function useAdminMeters() {
   const [pickerMeterOffset, setPickerMeterOffset] = useState(0);
   const [pickerMeterHasMore, setPickerMeterHasMore] = useState(true);
 
-  // د. ميزانية وربط العدادات
+  // ميزانية وإسناد
   const [assignmentAlias, setAssignmentAlias] = useState("");
   const [isAssigning, setIsCreatingAssign] = useState(false);
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
 
-  // هـ. حالات نافذة تأكيد إلغاء الإسناد من التبويب الأول (Unassign Confirmation)
+  // إلغاء الإسناد
   const [isUnassignVisible, setIsUnassignVisible] = useState(false);
-  const [associationToUnassign, setAssociationToUnassign] = useState(null); // يحفظ كائن الارتباط المراد فكه
+  const [associationToUnassign, setAssociationToUnassign] = useState(null);
   const [isUnassigning, setIsUnassigning] = useState(false);
 
-  // 1. جلب العدادات المرقّمة (التبويب الأول)
+  // 1. جلب العدادات
   const fetchMeters = useCallback(
     async (isInitial = true, searchVal = searchQuery) => {
       if (isInitial) {
@@ -92,24 +87,28 @@ export function useAdminMeters() {
             offset: currentOffset,
           },
         });
-        const newResults = response.data.results || [];
+        const rawResults = response.data.results || [];
+        const mappedResults = adminMapper.toMeterListViewModel(rawResults);
         const totalCount = response.data.count || 0;
 
         if (isInitial) {
-          setMeters(newResults);
+          setMeters(mappedResults);
           setOffset(limit);
         } else {
-          setMeters((prev) => [...prev, ...newResults]);
+          setMeters((prev) => [...prev, ...mappedResults]);
           setOffset((prev) => prev + limit);
         }
 
         if (isInitial) {
-          setHasMore(newResults.length < totalCount);
+          setHasMore(mappedResults.length < totalCount);
         } else {
-          setHasMore(meters.length + newResults.length < totalCount);
+          setHasMore(meters.length + mappedResults.length < totalCount);
         }
       } catch (err) {
-        setError("تعذر استرجاع قائمة العدادات من السيرفر.");
+        const errMsg =
+          err.response?.data?.message ||
+          "تعذر استرجاع قائمة العدادات من السيرفر.";
+        setError(errMsg);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -138,7 +137,7 @@ export function useAdminMeters() {
     searchQuery,
   ]);
 
-  // 2. جلب المشتركين المرقّمة للـ Picker الأول (التبويب الثاني)
+  // 2. جلب المشتركين للـ Picker 1
   const fetchUsersForPicker = useCallback(
     async (isInitial = true, searchVal = userSearchQuery) => {
       if (isInitial) {
@@ -158,21 +157,22 @@ export function useAdminMeters() {
             offset: currentOffset,
           },
         });
-        const newResults = response.data.results || [];
+        const rawResults = response.data.results || [];
+        const mappedResults = adminMapper.toUserListViewModel(rawResults);
         const totalCount = response.data.count || 0;
 
         if (isInitial) {
-          setUsersList(newResults);
+          setUsersList(mappedResults);
           setUserOffset(limit);
         } else {
-          setUsersList((prev) => [...prev, ...newResults]);
+          setUsersList((prev) => [...prev, ...mappedResults]);
           setUserOffset((prev) => prev + limit);
         }
 
         if (isInitial) {
-          setUserHasMore(newResults.length < totalCount);
+          setUserHasMore(mappedResults.length < totalCount);
         } else {
-          setUserHasMore(usersList.length + newResults.length < totalCount);
+          setUserHasMore(usersList.length + mappedResults.length < totalCount);
         }
       } catch (err) {
         console.log("فشل جلب المستخدمين للـ Picker:", err);
@@ -193,7 +193,7 @@ export function useAdminMeters() {
     fetchUsersForPicker(true, userSearchQuery);
   };
 
-  // 3. جلب العدادات المرقّمة للـ Picker الثاني (التبويب الثاني)
+  // 3. جلب العدادات للـ Picker 2
   const fetchMetersForPicker = useCallback(
     async (isInitial = true, searchVal = meterSearchQuery) => {
       if (isInitial) {
@@ -213,22 +213,23 @@ export function useAdminMeters() {
             offset: currentOffset,
           },
         });
-        const newResults = response.data.results || [];
+        const rawResults = response.data.results || [];
+        const mappedResults = adminMapper.toMeterListViewModel(rawResults);
         const totalCount = response.data.count || 0;
 
         if (isInitial) {
-          setPickerMetersList(newResults);
+          setPickerMetersList(mappedResults);
           setPickerMeterOffset(limit);
         } else {
-          setPickerMetersList((prev) => [...prev, ...newResults]);
+          setPickerMetersList((prev) => [...prev, ...mappedResults]);
           setPickerMeterOffset((prev) => prev + limit);
         }
 
         if (isInitial) {
-          setPickerMeterHasMore(newResults.length < totalCount);
+          setPickerMeterHasMore(mappedResults.length < totalCount);
         } else {
           setPickerMeterHasMore(
-            pickerMetersList.length + newResults.length < totalCount
+            pickerMetersList.length + mappedResults.length < totalCount
           );
         }
       } catch (err) {
@@ -267,7 +268,6 @@ export function useAdminMeters() {
     }
   }, [activeTab]);
 
-  // 5. إضافة عداد جديد
   const handleCreateMeter = async () => {
     setCreateError("");
     if (!newMeterId.trim())
@@ -290,7 +290,6 @@ export function useAdminMeters() {
     }
   };
 
-  // 6. تعديل عداد قائم (PUT)
   const handleUpdateMeter = async () => {
     setEditError("");
     if (!editMeterId.trim() || !selectedMeter)
@@ -316,7 +315,6 @@ export function useAdminMeters() {
     }
   };
 
-  // 7. حذف العداد نهائياً
   const handleDeleteMeter = async () => {
     if (!meterToDelete) return;
     setIsDeleting(true);
@@ -336,7 +334,6 @@ export function useAdminMeters() {
     }
   };
 
-  // 8. إسناد العداد لمستخدم
   const handleAssignMeter = async () => {
     setAssignError("");
     setAssignSuccess("");
@@ -369,7 +366,6 @@ export function useAdminMeters() {
     }
   };
 
-  // 9. خدمة إلغاء إسناد العداد (فصم العلاقة فورا وتحديث القائمة حياً)
   const handleUnassignMeter = async () => {
     if (!associationToUnassign) return;
     setIsUnassigning(true);
@@ -381,7 +377,7 @@ export function useAdminMeters() {
       if (response.data.status === "success") {
         setIsUnassignVisible(false);
         setAssociationToUnassign(null);
-        fetchMeters(true, searchQuery); // تحديث فوري وسريع لقائمة العدادات التبويب الأول
+        fetchMeters(true, searchQuery);
       }
     } catch (err) {
       console.log("تعذر إلغاء الإسناد:", err);
@@ -405,7 +401,6 @@ export function useAdminMeters() {
     fetchMeters,
     loadMore,
     hasMore,
-    // إنشاء
     isCreateVisible,
     setIsCreateVisible,
     newMeterId,
@@ -413,7 +408,6 @@ export function useAdminMeters() {
     isCreating,
     createError,
     handleCreateMeter,
-    // تعديل
     isEditVisible,
     setIsEditVisible,
     selectedMeter,
@@ -423,14 +417,12 @@ export function useAdminMeters() {
     isUpdating,
     editError,
     handleUpdateMeter,
-    // حذف
     isDeleteVisible,
     setIsDeleteVisible,
     meterToDelete,
     setMeterToDelete,
     isDeleting,
     handleDeleteMeter,
-    // تفضيلات وبحث الـ Picker الأول (المشتركين)
     isUserPickerVisible,
     setIsUserPickerVisible,
     selectedUserForAssign,
@@ -443,7 +435,6 @@ export function useAdminMeters() {
     loadMoreUsers,
     userHasMore,
     usersList,
-    // تفضيلات وبحث الـ Picker الثاني (العدادات)
     isMeterPickerVisible,
     setIsMeterPickerVisible,
     selectedMeterForAssign,
@@ -456,7 +447,6 @@ export function useAdminMeters() {
     loadMoreMeters,
     pickerMeterHasMore,
     pickerMetersList,
-    // إسناد وإلغاء الإسناد الفوري
     assignmentAlias,
     setAssignmentAlias,
     isAssigning,
