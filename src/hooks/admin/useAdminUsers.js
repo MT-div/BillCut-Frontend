@@ -1,23 +1,24 @@
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../../api/apiClient";
+import { adminMapper } from "../../api/mappers/adminMapper";
 
 export function useAdminUsers() {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // تحميل الصفحة التالية
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
 
-  // أ. حالات البحث والزر الموجه (مفصولة ومحمية)
+  // حالات البحث
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false); // تجميد وتعطيل زر البحث أثناء جلب البيانات
+  const [isSearching, setIsSearching] = useState(false);
 
-  // ب. تفضيلات الترقيم السحابي (Pagination)
+  // الترقيم السحابي
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const limit = 10;
 
-  // ج. حالات نافذة الإنشاء الجديد (Create Modal)
+  // حالات الإنشاء
   const [isCreateVisible, setIsCreateVisible] = useState(false);
   const [newFullName, setNewFullName] = useState("");
   const [newPhone, setNewPhone] = useState("");
@@ -25,7 +26,7 @@ export function useAdminUsers() {
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState("");
 
-  // د. حالات نافذة التعديل (Edit Modal)
+  // حالات التعديل
   const [isEditVisible, setIsEditVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [editFullName, setEditFullName] = useState("");
@@ -33,17 +34,17 @@ export function useAdminUsers() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [editError, setEditError] = useState("");
 
-  // هـ. حالات نافذة تأكيد الحذف (Delete Confirmation)
+  // حالات الحذف
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // دالة جلب البيانات والتحميل التدريجي (تدعم تصفير الإزاحة عند البحث الجديد)
+  // دالة الجلب والترقيم
   const fetchUsers = useCallback(
     async (isInitial = true, searchVal = searchQuery) => {
       if (isInitial) {
         if (searchVal.trim()) {
-          setIsSearching(true); // تشغيل لودر زر البحث الموجه عند البحث
+          setIsSearching(true);
         } else {
           setIsLoading(true);
         }
@@ -65,54 +66,55 @@ export function useAdminUsers() {
           },
         });
 
-        const newResults = response.data.results || [];
+        // تنقية وتنسيق مصفوفة النتائج عبر adminMapper
+        const rawResults = response.data.results || [];
+        const mappedResults = adminMapper.toUserListViewModel(rawResults);
         const totalCount = response.data.count || 0;
 
         if (isInitial) {
-          setUsers(newResults);
+          setUsers(mappedResults);
           setOffset(limit);
         } else {
-          setUsers((prev) => [...prev, ...newResults]); // دمج الصفحات الجديدة
+          setUsers((prev) => [...prev, ...mappedResults]);
           setOffset((prev) => prev + limit);
         }
 
-        // التحقق من توفر صفحات متبقية سحابياً
         if (isInitial) {
-          setHasMore(newResults.length < totalCount);
+          setHasMore(mappedResults.length < totalCount);
         } else {
-          setHasMore(users.length + newResults.length < totalCount);
+          setHasMore(users.length + mappedResults.length < totalCount);
         }
       } catch (err) {
-        setError("تعذر جلب قائمة المستخدمين النشطين من السيرفر.");
+        const errMsg =
+          err.response?.data?.message ||
+          "تعذر جلب قائمة المستخدمين النشطين من السيرفر.";
+        setError(errMsg);
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
         setIsLoadingMore(false);
-        setIsSearching(false); // فك تجميد زر البحث
+        setIsSearching(false);
       }
     },
     [offset, users.length, searchQuery]
   );
 
-  // دالة السحب للأعلى للتحديث الفوري الموحد (Pull-to-Refresh)
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
     fetchUsers(true, searchQuery);
   }, [fetchUsers, searchQuery]);
 
-  // دالة جلب وتحميل الصفحة التالية تلقائياً عند النزول لكعب الشاشة (Lazy Load)
   const loadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || isLoading || isSearching) return;
     fetchUsers(false, searchQuery);
   }, [isLoadingMore, hasMore, isLoading, isSearching, fetchUsers, searchQuery]);
 
-  // دالة تفعيل طلب البحث الموجه بالضغط على الزر (إلغاء الـ useEffect التلقائي لحماية السيرفر)
   const handleSearchSubmit = () => {
     fetchUsers(true, searchQuery);
   };
 
   useEffect(() => {
-    fetchUsers(true, ""); // الجلب الأولي الافتراضي للقائمة فارغة من قيود البحث عند فتح الشاشة لأول مرة
+    fetchUsers(true, "");
   }, []);
 
   const handleCreateUser = async () => {
@@ -132,7 +134,7 @@ export function useAdminUsers() {
       if (response.data.status === "success") {
         setCreatedTempPassword(response.data.data.temporaryPassword);
         setNewFullName("");
-        fetchUsers(true, ""); // تصفير البحث وتحديث القائمة فوراً
+        fetchUsers(true, "");
       }
     } catch (err) {
       setCreateError(err.response?.data?.message || "فشلت عملية إنشاء الحساب.");
@@ -199,10 +201,9 @@ export function useAdminUsers() {
     searchQuery,
     setSearchQuery,
     isSearching,
-    handleSearchSubmit, // دالة الإطلاق بالزر
+    handleSearchSubmit,
     loadMore,
     hasMore,
-    // إنشاء
     isCreateVisible,
     setIsCreateVisible,
     newFullName,
@@ -214,7 +215,6 @@ export function useAdminUsers() {
     isCreating,
     createError,
     handleCreateUser,
-    // تعديل
     isEditVisible,
     setIsEditVisible,
     selectedUser,
@@ -226,7 +226,6 @@ export function useAdminUsers() {
     isUpdating,
     editError,
     handleUpdateUser,
-    // حذف
     isDeleteVisible,
     setIsDeleteVisible,
     userToDelete,

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 
-// استيراد المكونات المحدثة والمشتركة
 import CustomCard from "../../components/CustomCard";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
@@ -33,7 +34,6 @@ export default function AdminUsersScreen() {
     isSearching,
     handleSearchSubmit,
     loadMore,
-    hasMore,
     isCreateVisible,
     setIsCreateVisible,
     newFullName,
@@ -63,7 +63,7 @@ export default function AdminUsersScreen() {
     handleDeleteUser,
   } = useAdminUsers();
 
-  const renderUserItem = ({ item }) => {
+  const renderUserItem = useCallback(({ item }) => {
     return (
       <CustomCard style={styles.userCard}>
         <View style={styles.cardHeader}>
@@ -105,9 +105,8 @@ export default function AdminUsersScreen() {
         </View>
       </CustomCard>
     );
-  };
+  }, []);
 
-  // مكوّن رسومي يظهر سبينر تحميل صغير في أسفل القائمة فقط أثناء تصفح وجلب الصفحة التالية
   const renderFooter = () => {
     if (!isLoadingMore) return null;
     return (
@@ -133,7 +132,7 @@ export default function AdminUsersScreen() {
     <View style={styles.container}>
       <AlertBanner type="error" message={error} />
 
-      {/* 1. مربع البحث السريع والزر الموجه والمحمي أفقياً بجانبه تماماً */}
+      {/* 1. مربع البحث السريع والزر الموجه والمحمي أفقياً بجانبه */}
       <View style={styles.headerBox}>
         <View style={styles.searchRow}>
           <View style={styles.searchInputContainer}>
@@ -141,6 +140,9 @@ export default function AdminUsersScreen() {
               placeholder="ابحث بالاسم أو رقم الهاتف..."
               value={searchQuery}
               onChangeText={setSearchQuery}
+              keyboardType="default"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
           </View>
           <TouchableOpacity
@@ -153,7 +155,7 @@ export default function AdminUsersScreen() {
               },
             ]}
             onPress={handleSearchSubmit}
-            disabled={isSearching} // # يعطل الزر أثناء الاتصال حماية للسيرفر
+            disabled={isSearching}
           >
             {isSearching ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -173,10 +175,10 @@ export default function AdminUsersScreen() {
         />
       </View>
 
-      {/* 2. قائمة المشتركين التفاعلية عالية الأداء المجهزة بالتحميل اللانهائي */}
+      {/* 2. قائمة المشتركين التفاعلية بالـ Lazy Load والمحسنة الأداء */}
       <FlatList
         data={filteredUsers}
-        keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+        keyExtractor={(item) => String(item.id)}
         renderItem={renderUserItem}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -186,10 +188,14 @@ export default function AdminUsersScreen() {
             colors={[theme.colors.primary]}
           />
         }
-        // # ربط التصفح اللانهائي والـ Lazy Load لـ 10 مشتركين في كل سحبة
         onEndReached={loadMore}
-        onEndReachedThreshold={0.2}
+        onEndReachedThreshold={0.3}
         ListFooterComponent={renderFooter}
+        // خصائص أداء الأعداد الضخمة (FlatList Performance Props)
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         ListEmptyComponent={
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyText}>لا يوجد مشتركين مسجلين حالياً.</Text>
@@ -207,85 +213,86 @@ export default function AdminUsersScreen() {
         animationType="fade"
         onRequestClose={() => setIsCreateVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>إنشاء حساب مشترك جديد</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>إنشاء حساب مشترك جديد</Text>
 
-            {createdTempPassword ? (
-              <View style={styles.successPwdBox}>
-                <Text style={styles.pwdTitle}>تم إنشاء الحساب بنجاح!</Text>
-                <Text style={styles.pwdLabel}>
-                  يرجى نسخ بيانات الدخول المؤقتة ومشاركتها مع المستهلك:
-                </Text>
-                <Text style={styles.pwdValue}>
-                  {" "}
-                  اسم الحساب: user_{newPhone.slice(-10)}
-                </Text>
-                <Text style={styles.pwdValue}>
-                  كلمة المرور: {createdTempPassword}
-                </Text>
-                <View style={{ height: theme.spacing.sm }} />
-                <CustomButton
-                  title="إغلاق وتمام الحفظ"
-                  onPress={() => {
-                    setIsCreateVisible(false);
-                    setNewPhone("");
-                  }}
-                  color={theme.colors.primary}
-                />
-              </View>
-            ) : (
-              <View style={{ width: "100%" }}>
-                <CustomAlert type="error" message={createError} />
-                <CustomInput
-                  label="الاسم الكامل للمشترك"
-                  placeholder="مثال: أحمد السوري"
-                  value={newFullName}
-                  onChangeText={setNewFullName}
-                />
-                <CustomInput
-                  label="رقم الهاتف الخلوي"
-                  placeholder="مثال: 0987654322"
-                  value={newPhone}
-                  onChangeText={setNewPhone}
-                  keyboardType="phone-pad"
-                />
-                <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={[
-                      styles.modalBtn,
-                      { backgroundColor: theme.colors.secondary },
-                    ]}
-                    onPress={handleCreateUser}
-                    disabled={isCreating}
-                  >
-                    {isCreating ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.modalBtnText}>إنشاء الحساب</Text>
-                    )}
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.modalBtn,
-                      { backgroundColor: theme.colors.border },
-                    ]}
-                    onPress={() => setIsCreateVisible(false)}
-                  >
-                    <Text
-                      style={[
-                        styles.modalBtnText,
-                        { color: theme.colors.text },
-                      ]}
-                    >
-                      إلغاء
-                    </Text>
-                  </TouchableOpacity>
+              {createdTempPassword ? (
+                <View style={styles.successPwdBox}>
+                  <Text style={styles.pwdTitle}>تم إنشاء الحساب بنجاح!</Text>
+                  <Text style={styles.pwdLabel}>
+                    يرجى نسخ بيانات الدخول المؤقتة ومشاركتها مع المستهلك:
+                  </Text>
+                  <Text style={styles.pwdValue}>
+                    اسم الحساب: user_{newPhone.slice(-10)}
+                  </Text>
+                  <Text style={styles.pwdValue}>
+                    كلمة المرور: {createdTempPassword}
+                  </Text>
+                  <View style={{ height: theme.spacing.sm }} />
+                  <CustomButton
+                    title="إغلاق وتمام الحفظ"
+                    onPress={() => {
+                      setIsCreateVisible(false);
+                      setNewPhone("");
+                    }}
+                    color={theme.colors.primary}
+                  />
                 </View>
-              </View>
-            )}
+              ) : (
+                <View style={{ width: "100%" }}>
+                  <CustomAlert type="error" message={createError} />
+                  <CustomInput
+                    label="الاسم الكامل للمشترك"
+                    placeholder="مثال: أحمد السوري"
+                    value={newFullName}
+                    onChangeText={setNewFullName}
+                  />
+                  <CustomInput
+                    label="رقم الهاتف الخلوي"
+                    placeholder="مثال: 0987654322"
+                    value={newPhone}
+                    onChangeText={setNewPhone}
+                    keyboardType="phone-pad"
+                  />
+                  <View style={styles.modalActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalBtn,
+                        { backgroundColor: theme.colors.secondary },
+                      ]}
+                      onPress={handleCreateUser}
+                      disabled={isCreating}
+                    >
+                      {isCreating ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.modalBtnText}>إنشاء الحساب</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.modalBtn,
+                        { backgroundColor: theme.colors.border },
+                      ]}
+                      onPress={() => setIsCreateVisible(false)}
+                    >
+                      <Text
+                        style={[
+                          styles.modalBtnText,
+                          { color: theme.colors.text },
+                        ]}
+                      >
+                        إلغاء
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* ==================== ب. نافذة تعديل بيانات المستخدم (Edit Modal) ==================== */}
@@ -295,52 +302,54 @@ export default function AdminUsersScreen() {
         animationType="fade"
         onRequestClose={() => setIsEditVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>تعديل بيانات الحساب المشترك</Text>
-            <CustomAlert type="error" message={editError} />
-            <CustomInput
-              label="الاسم الكامل المعدّل"
-              value={editFullName}
-              onChangeText={setEditFullName}
-            />
-            <CustomInput
-              label="رقم الهاتف المعدّل"
-              value={editPhone}
-              onChangeText={setEditPhone}
-              keyboardType="phone-pad"
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.primary },
-                ]}
-                onPress={handleUpdateUser}
-                disabled={isUpdating}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.modalBtnText}>حفظ التعديل</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.modalBtn,
-                  { backgroundColor: theme.colors.border },
-                ]}
-                onPress={() => setIsEditVisible(false)}
-              >
-                <Text
-                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>تعديل بيانات الحساب المشترك</Text>
+              <CustomAlert type="error" message={editError} />
+              <CustomInput
+                label="الاسم الكامل المعدّل"
+                value={editFullName}
+                onChangeText={setEditFullName}
+              />
+              <CustomInput
+                label="رقم الهاتف المعدّل"
+                value={editPhone}
+                onChangeText={setEditPhone}
+                keyboardType="phone-pad"
+              />
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.primary },
+                  ]}
+                  onPress={handleUpdateUser}
+                  disabled={isUpdating}
                 >
-                  إلغاء
-                </Text>
-              </TouchableOpacity>
+                  {isUpdating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.modalBtnText}>حفظ التعديل</Text>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalBtn,
+                    { backgroundColor: theme.colors.border },
+                  ]}
+                  onPress={() => setIsEditVisible(false)}
+                >
+                  <Text
+                    style={[styles.modalBtnText, { color: theme.colors.text }]}
+                  >
+                    إلغاء
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* ==================== ج. نافذة تأكيد الحذف النهائي (Delete Confirmation) ==================== */}
@@ -415,17 +424,17 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   searchRow: {
-    flexDirection: "row", // مواءمة أفقية ممتازة للبحث والزر بجانبه
+    flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
   },
   searchInputContainer: {
-    width: "78%", // حقل الإدخال يأخذ معظم العرض المتاح
-    marginBottom: -12, // موازنة ميكانيكية لعمق المارجن الأسفل لـ CustomInput
+    width: "78%",
+    marginBottom: -12,
   },
   searchBtn: {
-    width: "20%", // زر البحث يأخذ 20% ليتناسقا معاً
+    width: "20%",
     height: 48,
     borderRadius: 8,
     justifyContent: "center",
