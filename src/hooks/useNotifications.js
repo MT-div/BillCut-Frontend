@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import apiClient from "../api/apiClient";
 import { AuthContext } from "../context/AuthContext";
+import { notificationMapper } from "../api/mappers/notificationMapper";
 
 export function useNotifications() {
   const { user } = useContext(AuthContext);
-  const userId = user?.id; // نعتمد على معرّف المستخدم المباشر لجلب كافة إشعاراته
+  const userId = user?.id;
 
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +36,6 @@ export function useNotifications() {
       const currentOffset = isInitial ? 0 : offset;
 
       try {
-        // استدعاء الـ API الموحد الجديد لجميع العدادات التابعة للمستخدم
         const response = await apiClient.get("/api/user/notifications/", {
           params: {
             limit: limit,
@@ -43,21 +43,23 @@ export function useNotifications() {
           },
         });
 
-        const newResults = response.data.results || [];
+        // تنقية وتنسيق مصفوفة النتائج عبر الـ Mapper
+        const rawResults = response.data.results || [];
+        const mappedResults = notificationMapper.toViewModelList(rawResults);
         const totalCount = response.data.count || 0;
 
         if (isInitial) {
-          setNotifications(newResults);
+          setNotifications(mappedResults);
           setOffset(limit);
         } else {
-          setNotifications((prev) => [...prev, ...newResults]);
+          setNotifications((prev) => [...prev, ...mappedResults]);
           setOffset((prev) => prev + limit);
         }
 
         if (isInitial) {
-          setHasMore(newResults.length < totalCount);
+          setHasMore(mappedResults.length < totalCount);
         } else {
-          setHasMore(notifications.length + newResults.length < totalCount);
+          setHasMore(notifications.length + mappedResults.length < totalCount);
         }
       } catch (err) {
         const errMsg =

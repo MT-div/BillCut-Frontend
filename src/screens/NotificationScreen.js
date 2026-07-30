@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
 } from "react-native";
 
-// استيراد المكونات المشتركة والـ Hooks والـ ثيم
 import CustomCard from "../components/CustomCard";
 import AlertBanner from "../components/AlertBanner";
 import { useNotifications } from "../hooks/useNotifications";
@@ -23,59 +22,43 @@ export default function NotificationScreen() {
     error,
     onRefresh,
     loadMore,
-    hasMore,
-    userId, // # تحديث ليعتمد على الـ userId
+    userId,
   } = useNotifications();
 
-  const renderNotificationItem = ({ item }) => {
-    let borderRightColor = theme.colors.primary;
-    if (item.type === "ANOMALY") {
-      borderRightColor = theme.colors.errorText;
-    } else if (item.type === "BUDGET") {
-      borderRightColor = theme.colors.secondary;
-    }
-
-    const isUnread = !item.isRead;
-    const cardBg = isUnread ? theme.colors.surface : "#F4F6F7";
-    const titleColor = isUnread ? theme.colors.text : theme.colors.subtext;
-    const messageColor = isUnread ? theme.colors.subtext : "#95A5A6";
-
-    const formattedDate = new Date(item.timestamp).toLocaleDateString("ar-SY", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
+  // استخدام useCallback لثبات خوارزمية ريندر العناصر أثناء السكرول
+  const renderNotificationItem = useCallback(({ item }) => {
     return (
       <CustomCard
         style={[
           styles.notificationCard,
-          { borderRightColor, backgroundColor: cardBg },
+          {
+            borderRightColor: item.borderColor,
+            backgroundColor: item.cardBg,
+          },
         ]}
       >
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
-            {isUnread && <View style={styles.unreadDot} />}
-            <Text style={[styles.notificationTitle, { color: titleColor }]}>
+            {item.isUnread && <View style={styles.unreadDot} />}
+            <Text
+              style={[styles.notificationTitle, { color: item.titleColor }]}
+            >
               {item.title}
             </Text>
           </View>
-          <Text style={styles.dateText}>{formattedDate}</Text>
+          <Text style={styles.dateText}>{item.formattedDate}</Text>
         </View>
 
-        {/* عرض شارة / بادج اسم العداد المنسقة لليمين تماشياً مع الـ RTL والمزامنة */}
         <View style={styles.aliasBadge}>
           <Text style={styles.aliasBadgeText}>📌 {item.meterAlias}</Text>
         </View>
 
-        <Text style={[styles.messageText, { color: messageColor }]}>
+        <Text style={[styles.messageText, { color: item.messageColor }]}>
           {item.message}
         </Text>
       </CustomCard>
     );
-  };
+  }, []);
 
   const renderFooter = () => {
     if (!isLoadingMore) return null;
@@ -114,9 +97,7 @@ export default function NotificationScreen() {
 
       <FlatList
         data={notifications}
-        keyExtractor={(item, index) =>
-          item.notificationId?.toString() || index.toString()
-        }
+        keyExtractor={(item) => item.id}
         renderItem={renderNotificationItem}
         contentContainerStyle={styles.listContent}
         refreshControl={
@@ -127,8 +108,13 @@ export default function NotificationScreen() {
           />
         }
         onEndReached={loadMore}
-        onEndReachedThreshold={0.2}
+        onEndReachedThreshold={0.3}
         ListFooterComponent={renderFooter}
+        // خصائص أداء تحسين التمرير السريع (60fps Performance Props)
+        removeClippedSubviews={true}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         ListEmptyComponent={
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyText}>سجل التنبيهات فارغ حالياً.</Text>
@@ -235,10 +221,9 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: "600",
   },
-  // تنسيق شارة اسم العداد المنسقة والمحاذاة لليمين بأناقة
   aliasBadge: {
     backgroundColor: "#EBF5FB",
-    alignSelf: "flex-start", // يجعل الشارة تنكمش على مقاس الكلمة وتصطف لليمين
+    alignSelf: "flex-start",
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 4,
