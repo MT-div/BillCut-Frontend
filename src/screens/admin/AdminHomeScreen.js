@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 
-// استيراد المكونات المشتركة والثيم
 import CustomCard from "../../components/CustomCard";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert";
@@ -18,9 +18,9 @@ import { theme } from "../../theme/theme";
 
 export default function AdminHomeScreen({ navigation }) {
   const { user, logout, toggleViewMode } = useContext(AuthContext);
-  const { stats, isLoading, error } = useAdminHome();
+  const { stats, isLoading, isRefreshing, error, onRefresh } = useAdminHome();
 
-  if (isLoading) {
+  if (isLoading && !isRefreshing) {
     return (
       <View style={styles.loadingCenter}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -35,8 +35,14 @@ export default function AdminHomeScreen({ navigation }) {
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.scrollContent}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={onRefresh}
+          colors={[theme.colors.primary]}
+        />
+      }
     >
-      {/* عرض أخطاء الاتصال بالباكيند إن وجدت */}
       <CustomAlert type="error" message={error} />
 
       {/* 1. كارت الترحيب وزر التبديل الذكي لواجهة المستهلك */}
@@ -76,14 +82,13 @@ export default function AdminHomeScreen({ navigation }) {
         </CustomCard>
       </View>
 
-      {/* 3. كارت أدوات وقنوات الملاحة الإدارية السريعة (Production Quick Navigation) */}
+      {/* 3. كارت أداوات الملاحة الإدارية السريعة */}
       <CustomCard>
         <Text style={styles.cardTitle}>العمليات الحركية لحوكمة النظام</Text>
         <Text style={styles.subLabel}>
           اختصارات وصول سريعة ومباشرة للتنقل بين الشاشات الإدارية المفتوحة:
         </Text>
 
-        {/* أزرار تنقل واضحة وصريحة دون أي تعقيد أو محاكاة زائلة */}
         <CustomButton
           title="👥 إدارة وتعديل وحذف حسابات المشتركين (CRUD)"
           onPress={() => navigation.navigate("المستخدمين")}

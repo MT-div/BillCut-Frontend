@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 import {
   View,
   Text,
@@ -21,6 +22,8 @@ import { useSettings } from "../hooks/useSettings";
 import { theme } from "../theme/theme";
 
 export default function SettingsScreen() {
+  const { toggleViewMode } = useContext(AuthContext);
+
   const {
     isLoading,
     newPhone,
@@ -83,6 +86,27 @@ export default function SettingsScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {user?.role === "ADMIN" && (
+          <View style={styles.sectionContainer}>
+            <CustomCard style={styles.adminCard}>
+              <View style={styles.adminHeaderRow}>
+                <Text style={styles.adminCardTitle}>حوكمة صلاحيات الحساب</Text>
+                <View style={styles.adminBadge}>
+                  <Text style={styles.adminBadgeText}>مدير نظام 🛡️</Text>
+                </View>
+              </View>
+              <Text style={styles.subLabel}>
+                حسابك يحمل صلاحيات الإدارة العليا؛ يمكنك الانتقال حياً بين لوحة
+                الإدارة الشاملة للنظام وبين واجهة استهلاكك الكهربائي الشخصي:
+              </Text>
+              <CustomButton
+                title="التبديل إلى لوحة التحكم الإدارية 🛠️"
+                onPress={toggleViewMode}
+                color={theme.colors.primary}
+              />
+            </CustomCard>
+          </View>
+        )}
         {/* كارت 1: إدارة معلومات وتفاصيل الحساب (الهاتف) */}
         <View style={styles.sectionContainer}>
           <CustomCard style={styles.cardNoMargin}>

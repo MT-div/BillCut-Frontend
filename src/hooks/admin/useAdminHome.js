@@ -1,26 +1,35 @@
-// core/hooks/admin/useAdminHome.js - إدارة إحصائيات الإدارة المباشرة (خالٍ تماماً من المحاكاة)
-
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../../api/apiClient";
+import { adminMapper } from "../../api/mappers/adminMapper";
 
 export function useAdminHome() {
   const [stats, setStats] = useState({ usersCount: 0, metersCount: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  // جلب الإحصائيات الحية للوحة التحكم
   const fetchStats = useCallback(async () => {
+    setError("");
     try {
       const response = await apiClient.get("/api/admin/stats/");
       if (response.data.status === "success") {
-        setStats(response.data.data);
+        const mappedStats = adminMapper.toStatsViewModel(response.data.data);
+        setStats(mappedStats);
       }
     } catch (err) {
-      setError("تعذر استرجاع الإحصائيات السحابية.");
+      const errMsg =
+        err.response?.data?.message || "تعذر استرجاع الإحصائيات السحابية.";
+      setError(errMsg);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
+
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    fetchStats();
+  }, [fetchStats]);
 
   useEffect(() => {
     fetchStats();
@@ -29,7 +38,9 @@ export function useAdminHome() {
   return {
     stats,
     isLoading,
+    isRefreshing,
     error,
+    onRefresh,
     refetchStats: fetchStats,
   };
 }
