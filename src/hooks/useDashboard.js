@@ -11,6 +11,9 @@ export function useDashboard(meterId) {
   const fetchDashboardData = useCallback(async () => {
     if (!meterId) return;
     setError("");
+
+    setIsLoading(true);
+    setData(null);
     try {
       const response = await apiClient.get(`/api/meter/${meterId}/dashboard/`);
       if (response.data.status === "success") {

@@ -1,7 +1,6 @@
-// core/hooks/useAnalytics.js - قبول معرف العداد كمعامل ديناميكي خارجي لمنع جمود الكود
-
 import { useState, useEffect, useCallback } from "react";
 import apiClient from "../api/apiClient";
+import { analyticsMapper } from "../api/mappers/analyticsMapper";
 
 export function useAnalytics(meterId) {
   const [data, setData] = useState(null);
@@ -9,14 +8,17 @@ export function useAnalytics(meterId) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  // دالة جلب البيانات وتكامل الـ API بالتوقيت الفعلي المباشر
   const fetchAnalyticsData = useCallback(async () => {
     if (!meterId) return;
     setError("");
+    setIsLoading(true);
+    setData(null);
     try {
       const response = await apiClient.get(`/api/meter/${meterId}/analytics/`);
       if (response.data.status === "success") {
-        setData(response.data.data);
+        // تحويل وتنسيق بيانات الرسوم البيانية عبر الـ Mapper
+        const mappedData = analyticsMapper.toViewModel(response.data.data);
+        setData(mappedData);
       }
     } catch (err) {
       const errMsg =

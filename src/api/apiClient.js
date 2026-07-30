@@ -1,34 +1,28 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import { ENV } from "../config/env";
+import { Storage } from "../utils/storage";
 
-// تلميح هندسي هام: استبدل الرابط بـ IP حاسبك المحلي الفعلي (مثال: 192.168.1.100) عند تجربة التطبيق على هاتف حقيقي متصل بنفس الشبكة
-export const BASE_URL = "http://10.0.2.2:8000";
-
-// 1. إنشاء نسخة التخاطب الموحدة والمركزية عبر كلاس Axios
+// 1. إنشاء نسخة التخاطب الموحدة والمركزية باستخدام إعدادات البيئة
 const apiClient = axios.create({
-  baseURL: BASE_URL,
+  baseURL: ENV.API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
     Accept: "application/json",
   },
-  timeout: 10000, // مهلة اتصال 10 ثوانٍ لحماية كفاءة وأداء التطبيق عند ضعف الشبكة
+  timeout: ENV.TIMEOUT || 10000,
 });
 
-// 2. برمجة حاقن الطلبات التلقائي (Request Interceptor) لحقن الـ Bearer Token تلقائياً
-
+// 2. حاقن الطلبات التلقائي (Request Interceptor) لحقن Bearer Token
 apiClient.interceptors.request.use(
   async (config) => {
     try {
-      // 1. تعريف قائمة بالمسارات العامة المفتوحة التي لا تتطلب توثيقاً أمنياً (مثل تسجيل الدخول وتحديث التوكن)
       const publicRoutes = ["/api/auth/login/", "/api/token/refresh/"];
-
-      // 2. التحقق: إذا كان الرابط المطلوب ليس من المسارات العامة، نقوم بحقن التوكن بأمان
       const isPublicRoute = publicRoutes.some((route) =>
-        config.url.includes(route)
+        config.url?.includes(route)
       );
 
       if (!isPublicRoute) {
-        const accessToken = await SecureStore.getItemAsync("access_token");
+        const accessToken = await Storage.getAccessToken();
         if (accessToken) {
           config.headers.Authorization = `Bearer ${accessToken}`;
         }
@@ -38,37 +32,41 @@ apiClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// 3. برمجة مراقب الاستجابات (Response Interceptor) لمعالجة انتهاء صلاحية المفاتيح آلياً
+// 3. مراقب الاستجابات المحدث (Response Interceptor) لمنع فخ الـ 401 عند الدخول
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // التحقق مما إذا كان السيرفر أرجع 401 (انتهت الصلاحية) ولم يتم إعادة المحاولة للطلب مسبقاً
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // استثناء مسارات تسجيل الدخول وتجديد التوكن من عملية التجديد الصامته لمنع ابتلاع الأخطاء
+    const isAuthRoute =
+      originalRequest.url?.includes("/api/auth/login/") ||
+      originalRequest.url?.includes("/api/token/refresh/");
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthRoute
+    ) {
       originalRequest._retry = true;
       try {
-        // قراءة الـ Refresh Token الطويل الأجل لتحديث الصلاحية صامتاً
-        const refreshToken = await SecureStore.getItemAsync("refresh_token");
+        const refreshToken = await Storage.getRefreshToken();
 
         if (refreshToken) {
-          // إرسال طلب تحديث الصلاحية للسيرفر الخلفي لـ BillCut
-          const res = await axios.post(`${BASE_URL}/api/token/refresh/`, {
-            refresh: refreshToken,
-          });
+          const res = await axios.post(
+            `${ENV.API_BASE_URL}/api/token/refresh/`,
+            {
+              refresh: refreshToken,
+            }
+          );
 
-          if (res.status === 200) {
+          if (res.status === 200 && res.data.access) {
             const newAccessToken = res.data.access;
+            await Storage.setAccessToken(newAccessToken);
 
-            // حفظ الـ Token الجديد المحدث في الذاكرة المشفرة للهاتف فوراً
-            await SecureStore.setItemAsync("access_token", newAccessToken);
-
-            // تحديث ترويسة الطلب الأصلي بالـ Token الجديد وإعادة إرساله بنجاح صامت
             originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
             return axios(originalRequest);
           }
@@ -78,7 +76,7 @@ apiClient.interceptors.response.use(
           "فشل التحديث التلقائي للـ Token، الجلسة منتهية تماماً:",
           refreshError
         );
-        // هنا يمكن إرسال حدث لتسجيل الخروج التلقائي للمستخدم وإعادته لصفحة الدخول الآمنة
+        await Storage.clearSession(); // مسح الجلسة المنتهية بنظافة من الهاتف
       }
     }
     return Promise.reject(error);

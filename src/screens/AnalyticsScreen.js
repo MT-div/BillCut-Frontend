@@ -12,7 +12,6 @@ import {
 import { LineChart, BarChart } from "react-native-chart-kit";
 import { Circle } from "react-native-svg";
 
-// استيراد المكونات المشتركة والـ Hooks والـ ثيم
 import CustomCard from "../components/CustomCard";
 import AlertBanner from "../components/AlertBanner";
 import { useAnalytics } from "../hooks/useAnalytics";
@@ -20,23 +19,20 @@ import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const CARD_INNER_WIDTH = SCREEN_WIDTH - 48; // نفس العرض المتاح داخل الكارت، بدون أي تمرير أفقي
+const CARD_INNER_WIDTH = SCREEN_WIDTH - 48;
 
 export default function AnalyticsScreen() {
   const { user } = useContext(AuthContext);
 
-  // 1. إدارة حالة العداد النشط في التحليلات (تبدأ من الافتراضي وتتبدل حراً ومستقلاً عن الداشبورد)
   const [activeMeterId, setActiveMeterId] = useState(user?.defaultMeterId);
 
-  // تحديث التوجيه فوراً في حال تغير العداد الافتراضي للحساب
   useEffect(() => {
     if (user?.defaultMeterId) {
       setActiveMeterId(user.defaultMeterId);
     }
   }, [user?.defaultMeterId]);
 
-  // استدعاء وتمرير العداد المختار حياً للـ Hook المطور
-  const { data, isLoading, isRefreshing, error, onRefresh, meterId } =
+  const { data, isLoading, isRefreshing, error, onRefresh } =
     useAnalytics(activeMeterId);
 
   if (!activeMeterId) {
@@ -60,36 +56,6 @@ export default function AnalyticsScreen() {
     );
   }
 
-  // اختصار أسماء الأشهر لأول 3 أحرف
-  const monthlyLabels =
-    data?.monthlyHistory?.map((item) => {
-      const parts = item.monthName.split(" ");
-      return parts[0].substring(0, 3);
-    }) || [];
-  const monthlyValues = data?.monthlyHistory?.map((item) =>
-    parseFloat(item.consumptionKWh)
-  ) || [0];
-
-  // إعداد مصفوفة الـ 15 يوماً الأخيرة (RTL المنسق)
-  const dailyLabels =
-    data?.dailyHistory?.map((item, idx) =>
-      idx % 3 === 0 ? item.date.split("-")[2] : ""
-    ) || [];
-  const dailyActual = data?.dailyHistory?.map((item) =>
-    parseFloat(item.actualKWh)
-  ) || [0];
-  const dailyPredicted = data?.dailyHistory?.map((item) =>
-    parseFloat(item.predictedKWh)
-  ) || [0];
-
-  const anomalousDays =
-    data?.dailyHistory?.filter((item) => item.isAnomalous) || [];
-  const hasAnomaly = anomalousDays.length > 0;
-  const anomalyDatesString = anomalousDays
-    .map((item) => item.date.split("-")[2])
-    .join("، ");
-
-  // إعدادات مشتركة أساسية بين المخططين
   const baseChartConfig = {
     backgroundColor: theme.colors.surface,
     backgroundGradientFrom: theme.colors.surface,
@@ -127,7 +93,7 @@ export default function AnalyticsScreen() {
         />
       }
     >
-      {/* 2. مبدل العدادات الأفقي التفاعلي (الأزرار البيضاوية الأنيقة Chips للتحليلات) */}
+      {/* مبدل العدادات الأفقي التفاعلي (Chips) */}
       {user?.meters && user.meters.length > 1 && (
         <View style={styles.switcherContainer}>
           <Text style={styles.switcherTitle}>
@@ -151,7 +117,7 @@ export default function AnalyticsScreen() {
                         : "#E2E8F0",
                     },
                   ]}
-                  onPress={() => setActiveMeterId(item.meterId)} // تبديل العداد حياً وتحديث المخططات الذكية فوراً
+                  onPress={() => setActiveMeterId(item.meterId)}
                 >
                   <Text
                     style={[
@@ -168,7 +134,6 @@ export default function AnalyticsScreen() {
         </View>
       )}
 
-      {/* عرض خطأ الاتصال بالسيرفر إن وجد */}
       <AlertBanner type="error" message={error} />
 
       {/* المخطط الأول: الاستهلاك السنوي بالأعمدة المتباعدة */}
@@ -179,8 +144,8 @@ export default function AnalyticsScreen() {
 
         <BarChart
           data={{
-            labels: monthlyLabels,
-            datasets: [{ data: monthlyValues }],
+            labels: data?.monthlyChart?.labels || ["لا توجد بيانات"],
+            datasets: [{ data: data?.monthlyChart?.values || [0] }],
           }}
           width={CARD_INNER_WIDTH}
           height={220}
@@ -200,11 +165,7 @@ export default function AnalyticsScreen() {
               الاستهلاك الإجمالي المقدر للشهرين:
             </Text>
             <Text style={styles.forecastValue}>
-              {parseFloat(data?.currentCycleForecast?.predictedMonth1KWh || 0) +
-                parseFloat(
-                  data?.currentCycleForecast?.predictedMonth2KWh || 0
-                )}{" "}
-              ك.و.س
+              {data?.totalPredictedCycleKWh || 0} ك.و.س
             </Text>
           </View>
           <View style={styles.forecastRow}>
@@ -214,7 +175,7 @@ export default function AnalyticsScreen() {
             <Text
               style={[styles.forecastValue, { color: theme.colors.primary }]}
             >
-              {data?.currentCycleForecast?.expectedBillSYP} ل.س
+              {data?.expectedBillSYP || 0} ل.س
             </Text>
           </View>
         </View>
@@ -229,15 +190,15 @@ export default function AnalyticsScreen() {
 
           <LineChart
             data={{
-              labels: dailyLabels,
+              labels: data?.dailyChart?.labels || ["لا توجد بيانات"],
               datasets: [
                 {
-                  data: dailyActual,
+                  data: data?.dailyChart?.actualValues || [0],
                   color: (opacity = 1) => `rgba(27, 79, 114, ${opacity})`,
                   strokeWidth: 3,
                 },
                 {
-                  data: dailyPredicted,
+                  data: data?.dailyChart?.predictedValues || [0],
                   color: (opacity = 1) => `rgba(93, 173, 226, ${opacity})`,
                   strokeWidth: 2,
                 },
@@ -250,31 +211,19 @@ export default function AnalyticsScreen() {
             fromZero
             withShadow={false}
             style={styles.chart}
-            // رسم النقاط المتجهة يدوياً بدقة كاملة ومنع تداخل الحقول
             renderDotContent={({ x, y, index, indexData }) => {
-              const isActualDataset = indexData === dailyActual[index];
-
-              if (isActualDataset) {
-                return (
-                  <Circle
-                    key={`actual-dot-${index}`}
-                    cx={x}
-                    cy={y}
-                    r="4"
-                    fill={theme.colors.primary}
-                    stroke="#FFFFFF"
-                    strokeWidth="1.5"
-                  />
-                );
-              }
+              const actualVal = data?.dailyChart?.actualValues?.[index];
+              const isActualDataset = indexData === actualVal;
 
               return (
                 <Circle
-                  key={`predicted-dot-${index}`}
+                  key={`dot-${indexData}-${index}`}
                   cx={x}
                   cy={y}
                   r="4"
-                  fill="rgb(93, 173, 226)"
+                  fill={
+                    isActualDataset ? theme.colors.primary : "rgb(93, 173, 226)"
+                  }
                   stroke="#FFFFFF"
                   strokeWidth="1.5"
                 />
@@ -282,7 +231,6 @@ export default function AnalyticsScreen() {
             }}
           />
 
-          {/* صندوق إرشادي مخصص (Custom Legend Row) */}
           <View style={styles.legendRow}>
             <View style={styles.legendItem}>
               <View
@@ -305,13 +253,12 @@ export default function AnalyticsScreen() {
           </View>
         </CustomCard>
 
-        {/* صندوق تحذير كشف الخلل والشذوذ الموضعي */}
-        {hasAnomaly && (
+        {data?.hasAnomaly && (
           <Text style={styles.alertUnderCard}>
             ⚠️ تحذير عاجل: كشف النظام نمط استهلاك شاذ وغير اعتيادي (عطل أو تسريب
-            كهربائي محتمل) في أيام التواريخ التالية: ({anomalyDatesString}).
-            يرجى التحقق من سلامة الأجهزة الكهربائية النشطة في تلك الأيام لتلافي
-            الهدر المالي.
+            كهربائي محتمل) في أيام التواريخ التالية: ({data?.anomalyDatesString}
+            ). يرجى التحقق من سلامة الأجهزة الكهربائية النشطة في تلك الأيام
+            لتلافي الهدر المالي.
           </Text>
         )}
       </View>
@@ -425,7 +372,6 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     fontWeight: "bold",
   },
-  // تنسيق مبدل العدادات الأفقي الأنيق
   switcherContainer: {
     marginBottom: theme.spacing.md,
     width: "100%",
