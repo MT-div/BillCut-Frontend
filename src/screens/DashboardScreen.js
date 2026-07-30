@@ -10,12 +10,10 @@ import {
   TouchableOpacity,
 } from "react-native";
 
-// استيراد المكونات المشتركة
 import CustomCard from "../components/CustomCard";
 import AlertBanner from "../components/AlertBanner";
 import ProgressGauge from "../components/ProgressGauge";
 
-// استيراد الـ Custom Hook وإدارة الجلسات والثيم
 import { useDashboard } from "../hooks/useDashboard";
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
@@ -23,17 +21,14 @@ import { theme } from "../theme/theme";
 export default function DashboardScreen() {
   const { logout, user } = useContext(AuthContext);
 
-  // 1. إدارة حالة العداد النشط حالياً ديناميكياً (تبدأ من العداد الافتراضي للمستخدم)
   const [activeMeterId, setActiveMeterId] = useState(user?.defaultMeterId);
 
-  // تحديث معرّف العداد النشط فوراً عند تغير العداد الافتراضي للجلسة
   useEffect(() => {
     if (user?.defaultMeterId) {
       setActiveMeterId(user.defaultMeterId);
     }
   }, [user?.defaultMeterId]);
 
-  // تمرير معرّف العداد النشط المختار حالياً إلى الـ Hook لجلب بياناته حياً
   const { data, isLoading, isRefreshing, error, onRefresh } =
     useDashboard(activeMeterId);
 
@@ -64,37 +59,14 @@ export default function DashboardScreen() {
     );
   }
 
-  // قراءات الحدود والاستهلاك والتعرفة
-  const supportLimit = parseFloat(data?.supportLimitKWh) || 300.0;
-  const budgetLimit = parseFloat(data?.budgetLimitKWh) || 0.0;
-  const actualConsumption = parseFloat(data?.cycleActualConsumptionKWh) || 0.0;
-
-  // تفعيل التنبيهات الكبرى في أعلى لوحة المراقبة
-  const showSupportBanner = actualConsumption >= supportLimit;
-  const showBudgetBanner = budgetLimit > 0 && actualConsumption >= budgetLimit;
-
-  const supportBannerMessage = showSupportBanner
-    ? `تنبيه: لقد تجاوزت استهلاك الشريحة المدعومة لهذه الدورة (${parseInt(
-        supportLimit
-      )} ك.و.س)، الاستهلاك الإضافي سيُحتسب بسعر الشريحة العادية.`
+  // رسائل اللافتات المجهزة نظيفاً من الـ ViewModel
+  const supportBannerMessage = data?.isSupportExceeded
+    ? `تنبيه: لقد تجاوزت استهلاك الشريحة المدعومة لهذه الدورة (${data.supportLimitKWh} ك.و.س)، الاستهلاك الإضافي سيُحتسب بسعر الشريحة العادية.`
     : null;
 
-  const budgetBannerMessage = showBudgetBanner
+  const budgetBannerMessage = data?.isBudgetExceeded
     ? "تنبيه: لقد تجاوزت الميزانية المالية المستهدفة والمحددة من قبلك لهذه الدورة الكهربائية."
     : null;
-
-  // التحقق الرياضي الدقيق لتنشيط رسائل التجاوز الأربعة التكيفية تحت كعب الكروت
-  const isCycleExceeded =
-    actualConsumption > parseFloat(data?.predictedCycleConsumptionKWh);
-  const isTodayExceeded =
-    parseFloat(data?.todayActualKWh) > parseFloat(data?.todayPredictedKWh);
-
-  const isSubTargetExceeded =
-    parseFloat(data?.todayActualKWh) > parseFloat(data?.avgSubTargetKWh) &&
-    parseFloat(data?.avgSubTargetKWh) > 0;
-  const isBudgetTargetExceeded =
-    parseFloat(data?.todayActualKWh) > parseFloat(data?.avgBudgetTargetKWh) &&
-    parseFloat(data?.avgBudgetTargetKWh) > 0;
 
   return (
     <ScrollView
@@ -108,7 +80,7 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* 2. مبدل العدادات الأفقي التفاعلي (Chips) */}
+      {/* مبدل العدادات الأفقي التفاعلي (Chips) */}
       {user?.meters && user.meters.length > 1 && (
         <View style={styles.switcherContainer}>
           <Text style={styles.switcherTitle}>العداد الكهربائي النشط:</Text>
@@ -130,7 +102,7 @@ export default function DashboardScreen() {
                         : "#E2E8F0",
                     },
                   ]}
-                  onPress={() => setActiveMeterId(item.meterId)} // تبديل العداد حياً وجلب بياناته بكسر من الثانية
+                  onPress={() => setActiveMeterId(item.meterId)}
                 >
                   <Text
                     style={[
@@ -147,13 +119,8 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* عرض خطأ الاتصال بالسيرفر إن وجد */}
       <AlertBanner type="error" message={error} />
-
-      {/* عرض لافتة تجاوز الشريحة المدعومة في الأعلى إن تحقق الشرط */}
       <AlertBanner type="error" message={supportBannerMessage} />
-
-      {/* عرض لافتة تجاوز الميزانية المالية في الأعلى إن تحقق الشرط */}
       <AlertBanner type="error" message={budgetBannerMessage} />
 
       <CustomCard style={styles.gaugeCard}>
@@ -161,38 +128,37 @@ export default function DashboardScreen() {
           مؤشر استهلاك الدورة مقارنة بحد الدعم والميزانية
         </Text>
 
-        {/* عرض المؤشرات الدائرية الجانبية بجانب بعضها لسهولة المقارنة البصرية */}
         <View style={styles.gaugesRow}>
           {/* الدائرة الأولى: الدعم */}
           <View style={styles.gaugeContainer}>
-            <ProgressGauge value={actualConsumption} max={supportLimit} />
+            <ProgressGauge
+              value={data?.cycleActualConsumptionKWh || 0}
+              max={data?.supportLimitKWh || 300}
+            />
             <Text style={styles.gaugeLabel}>مؤشر استهلاك حد الدعم</Text>
-            {/* إضافة قيمة حد الدعم بالكيلوواط تحت الدائرة مباشرة */}
             <Text style={styles.gaugeValueDetail}>
-              حد الدعم: {parseInt(supportLimit)} ك.و.س
+              حد الدعم: {data?.supportLimitKWh} ك.و.س
             </Text>
           </View>
 
           {/* الدائرة الثانية: الميزانية */}
           <View style={styles.gaugeContainer}>
             <ProgressGauge
-              value={actualConsumption}
-              max={budgetLimit > 0 ? budgetLimit : 1.0}
+              value={data?.cycleActualConsumptionKWh || 0}
+              max={data?.budgetLimitKWh > 0 ? data.budgetLimitKWh : 1.0}
             />
             <Text style={styles.gaugeLabel}>مؤشر استهلاك الميزانية</Text>
-            {/* إضافة قيمة الميزانية بالليرة السورية تحت الدائرة مباشرة (حل الـ NaN) */}
             <Text
               style={[styles.gaugeValueDetail, { color: theme.colors.primary }]}
             >
               الميزانية:{" "}
-              {budgetLimit > 0
-                ? `${parseInt(data?.targetBudgetSYP)} ل.س`
+              {data?.budgetLimitKWh > 0
+                ? `${data?.targetBudgetSYP} ل.س`
                 : "غير محددة"}
             </Text>
           </View>
         </View>
 
-        {/* عرض الأرقام خارج الدائرة بكروت منسقة وخالية من الفواصل العشرية */}
         <View style={styles.gaugeStats}>
           <Text style={styles.statsText}>
             الاستهلاك الفعلي للدورة: {data?.cycleActualConsumptionKWh} ك.و.س
@@ -224,7 +190,7 @@ export default function DashboardScreen() {
         </CustomCard>
       </View>
 
-      {/* كارت التقديرات المالية والاستهلاكية بنهاية الدورة */}
+      {/* التقديرات المالية والاستهلاكية */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>
@@ -245,15 +211,14 @@ export default function DashboardScreen() {
             <Text style={styles.infoValue}>{data?.predictedBillSYP} ل.س</Text>
           </View>
         </CustomCard>
-        {/* التحذير 1: لقد تجاوزت الاستهلاك المتوقع لهذه الدورة */}
-        {isCycleExceeded && (
+        {data?.isCycleExceeded && (
           <Text style={styles.alertUnderCard}>
             ⚠️ لقد تجاوزت الاستهلاك المتوقع لهذه الدورة الكهربائية.
           </Text>
         )}
       </View>
 
-      {/* كارت استهلاك اليوم الحالي */}
+      {/* استهلاك اليوم الحالي */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>مراقبة استهلاك اليوم الحالي</Text>
@@ -264,22 +229,20 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <View style={styles.infoRow}>
-            {/* تعديل المسمى ليكون الاستهلاك المتوقع لليوم */}
             <Text style={styles.infoLabel}>الاستهلاك المتوقع لليوم:</Text>
             <Text style={styles.infoValue}>
               {data?.todayPredictedKWh} ك.و.س
             </Text>
           </View>
         </CustomCard>
-        {/* التحذير 2: لقد تجاوزت الاستهلاك المتوقع لليوم */}
-        {isTodayExceeded && (
+        {data?.isTodayExceeded && (
           <Text style={styles.alertUnderCard}>
             ⚠️ لقد تجاوزت الاستهلاك المتوقع المخطط له لليوم الحالي.
           </Text>
         )}
       </View>
 
-      {/* كارت الحدود الاستهلاكية اليومية المستهدفة لليوم الحالي */}
+      {/* الحدود اليومية المتاحة */}
       <View style={styles.sectionContainer}>
         <CustomCard style={styles.cardNoMargin}>
           <Text style={styles.cardTitle}>
@@ -303,16 +266,14 @@ export default function DashboardScreen() {
           </View>
         </CustomCard>
 
-        {/* التحذير 3: لقد تجاوزت المعدل اليومي للبقاء في الدعم */}
-        {isSubTargetExceeded && (
+        {data?.isSubTargetExceeded && (
           <Text style={styles.alertUnderCard}>
             ⚠️ لقد تجاوزت المعدل اليومي الموصى به للبقاء في الدعم، سوف يتم حساب
             المعدل الجديد في نهاية اليوم عند منتصف الليل.
           </Text>
         )}
 
-        {/* التحذير 4: لقد تجاوزت المعدل اليومي للبقاء في الميزانية */}
-        {isBudgetTargetExceeded && (
+        {data?.isBudgetTargetExceeded && (
           <Text
             style={[
               styles.alertUnderCard,
@@ -458,7 +419,6 @@ const styles = StyleSheet.create({
     textAlign: "right",
     lineHeight: 16,
   },
-  // تصميم مبدل العدادات الأفقي الأنيق
   switcherContainer: {
     marginBottom: theme.spacing.md,
     width: "100%",
