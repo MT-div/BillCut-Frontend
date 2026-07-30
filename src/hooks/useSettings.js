@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import apiClient from "../api/apiClient";
 import { AuthContext } from "../context/AuthContext";
+import { settingsMapper } from "../api/mappers/settingsMapper";
 
 export function useSettings() {
   const { user, logout, updateUserData } = useContext(AuthContext);
@@ -28,7 +29,7 @@ export function useSettings() {
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
-  // ج. حالات كارت الميزانية (تحديد العداد الميزانية النشط اختيارياً)
+  // ج. حالات كارت الميزانية
   const [activeBudgetMeterId, setActiveBudgetMeterId] = useState(
     user?.defaultMeterId || ""
   );
@@ -61,12 +62,8 @@ export function useSettings() {
         `/api/user/${userId}/notification_settings/`
       );
       if (resSettings.data.status === "success") {
-        const d = resSettings.data.data;
-        setNotificationPrefs({
-          budgetPush: d.budgetPushEnabled,
-          tierPush: d.tierPushEnabled,
-          anomalyPush: d.anomalyPushEnabled,
-        });
+        const mappedPrefs = settingsMapper.toDomain(resSettings.data.data);
+        setNotificationPrefs(mappedPrefs);
       }
     } catch (err) {
       console.log("فشل استرجاع الإعدادات:", err);
@@ -75,7 +72,13 @@ export function useSettings() {
     }
   }, [userId]);
 
-  // 1. تعديل الهاتف
+  // 1. تعديل الهاتف مع المسح الموضعي للأخطاء
+  const handlePhoneChange = (text) => {
+    setNewPhone(text);
+    if (phoneError) setPhoneError("");
+    if (phoneSuccess) setPhoneSuccess("");
+  };
+
   const handleUpdatePhone = async () => {
     setPhoneError("");
     setPhoneSuccess("");
@@ -156,7 +159,7 @@ export function useSettings() {
     }
   };
 
-  // 3. تعديل الميزانية لعداد محدد يتم اختياره من الواجهة
+  // 3. تعديل الميزانية
   const handleUpdateBudget = async () => {
     setBudgetError("");
     setBudgetSuccess("");
@@ -189,7 +192,7 @@ export function useSettings() {
     }
   };
 
-  // 4. تعديل الاسم المستعار للعداد (سحابياً وتحديث محلياً بالـ Context)
+  // 4. تعديل الاسم المستعار للعداد
   const handleRenameMeter = async () => {
     if (!newAliasInput.trim() || !meterToRename) return;
     setIsRenaming(true);
@@ -201,8 +204,7 @@ export function useSettings() {
         }
       );
       if (response.data.status === "success") {
-        // تحديث مصفوفة العدادات محلياً فوراً في الهاتف لتعكس التسمية الجديدة
-        const updatedMeters = user.meters.map((m) =>
+        const updatedMeters = (user?.meters || []).map((m) =>
           m.meterId === meterToRename.meterId
             ? { ...m, alias: newAliasInput.trim() }
             : m
@@ -219,7 +221,7 @@ export function useSettings() {
     }
   };
 
-  // 5. تعيين العداد كافتراضي للتطبيق بنقرة واحدة وتحديث محلياً
+  // 5. تعيين العداد كافتراضي
   const handleSetDefaultMeter = async (preferenceId, targetMeterId) => {
     try {
       const response = await apiClient.put(
@@ -229,27 +231,26 @@ export function useSettings() {
         }
       );
       if (response.data.status === "success") {
-        const updatedMeters = user.meters.map((m) =>
+        const updatedMeters = (user?.meters || []).map((m) =>
           m.meterId === targetMeterId
             ? { ...m, isDefault: true }
             : { ...m, isDefault: false }
         );
-        await updateUserData(updatedMeters, targetMeterId); // مزامنة العداد الافتراضي محلياً
+        await updateUserData(updatedMeters, targetMeterId);
       }
     } catch (err) {
       console.log("تعذر تعيين العداد الافتراضي:", err);
     }
   };
 
+  // 6. التبديل مع الاستفادة من settingsMapper
   const handleTogglePreference = (field) => {
     setNotificationPrefs((prev) => {
       const updated = { ...prev, [field]: !prev[field] };
+      const payload = settingsMapper.toApiPayload(updated);
+
       apiClient
-        .post(`/api/user/${userId}/notification_settings/`, {
-          budgetPushEnabled: updated.budgetPush,
-          tierPushEnabled: updated.tierPush,
-          anomalyPushEnabled: updated.anomalyPush,
-        })
+        .post(`/api/user/${userId}/notification_settings/`, payload)
         .catch(() => {
           setNotificationPrefs((current) => ({
             ...current,
@@ -267,7 +268,7 @@ export function useSettings() {
   return {
     isLoading,
     newPhone,
-    setNewPhone,
+    setNewPhone: handlePhoneChange,
     phoneCurrentPassword,
     setPhoneCurrentPassword,
     phoneError,
