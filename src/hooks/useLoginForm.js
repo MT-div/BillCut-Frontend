@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useRef } from "react";
 import { AuthContext } from "../context/AuthContext";
 
 export function useLoginForm() {
@@ -8,10 +8,25 @@ export function useLoginForm() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // فصل وتحديد أخطاء الحقول لتلوين مدخلاتها بالأحمر موضعياً
   const [usernameError, setUsernameError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [globalError, setGlobalError] = useState("");
+
+  // مرجع لحقل كلمة المرور للتركيز عليه تلقائياً عند الضغط على "Next" في الكيبورد
+  const passwordInputRef = useRef(null);
+
+  // تحديث الحقول مع مسح الأخطاء الموضعية فوراً أثناء الكتابة (Interactive UX)
+  const handleUsernameChange = (text) => {
+    setUsername(text);
+    if (usernameError) setUsernameError("");
+    if (globalError) setGlobalError("");
+  };
+
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    if (passwordError) setPasswordError("");
+    if (globalError) setGlobalError("");
+  };
 
   const handleLogin = async () => {
     setUsernameError("");
@@ -45,14 +60,14 @@ export function useLoginForm() {
 
   return {
     username,
-    setUsername,
+    setUsername: handleUsernameChange,
     password,
-    setPassword,
+    setPassword: handlePasswordChange,
     isLoading,
     usernameError,
     passwordError,
     globalError,
-    setGlobalError,
+    passwordInputRef,
     handleLogin,
   };
 }

@@ -3,6 +3,7 @@ import * as SecureStore from "expo-secure-store";
 import axios from "axios";
 import apiClient from "../api/apiClient";
 export const AuthContext = createContext();
+import { userMapper } from "../api/mappers/userMapper";
 
 //   : استبدل الرابط بـ IP حاسبك المحلي عند تجربة التطبيق على هاتف حقيقي متصل بنفس الشبكة
 export const BASE_URL = "http://10.0.2.2:8000";
@@ -25,8 +26,7 @@ export const AuthProvider = ({ children }) => {
       });
       if (response.data.status === "success") {
         const { access, refresh } = response.data.tokens;
-        const userData = response.data.user;
-
+        const userData = userMapper.toDomain(response.data.user);
         setUserToken(access);
         setUser(userData);
         // ضبط وضع العرض الافتراضي بناءً على دور المستخدم

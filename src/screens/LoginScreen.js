@@ -5,9 +5,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ScrollView,
 } from "react-native";
 
-// استيراد المكونات المحدثة والمشتركة
 import CustomInput from "../components/CustomInput";
 import CustomButton from "../components/CustomButton";
 import CustomAlert from "../components/CustomAlert";
@@ -25,50 +27,63 @@ export default function LoginScreen() {
     usernameError,
     passwordError,
     globalError,
+    passwordInputRef,
     handleLogin,
   } = useLoginForm();
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <View style={styles.card}>
-        <Text style={styles.brandTitle}>تطبيق BillCut</Text>
-        <Text style={styles.brandSubtitle}>
-          إدارة الطاقة والتنبؤ بالفواتير وكشف الخلل
-        </Text>
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.container}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
+            <Text style={styles.brandTitle}>تطبيق BillCut</Text>
+            <Text style={styles.brandSubtitle}>
+              إدارة الطاقة والتنبؤ بالفواتير وكشف الخلل
+            </Text>
 
-        {/* عرض التنبيه العام المشترك للخطأ السحابي */}
-        <CustomAlert type="error" message={globalError} />
+            <CustomAlert type="error" message={globalError} />
 
-        {/* حقل اسم المستخدم المجهز برابط التحذير الموضعي الأحمر */}
-        <CustomInput
-          label="اسم الحساب"
-          placeholder="أدخل اسم المستخدم أو رقم الهاتف"
-          value={username}
-          onChangeText={setUsername}
-          error={usernameError}
-        />
+            <CustomInput
+              label="اسم الحساب"
+              placeholder="أدخل اسم المستخدم أو رقم الهاتف"
+              value={username}
+              onChangeText={setUsername}
+              error={usernameError}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordInputRef.current?.focus()}
+            />
 
-        {/* حقل كلمة المرور المجهز برابط التحذير الموضعي الأحمر */}
-        <CustomInput
-          label="كلمة المرور"
-          placeholder="أدخل كلمة المرور الخاصة بك"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={true}
-          error={passwordError}
-        />
+            <CustomInput
+              ref={passwordInputRef}
+              label="كلمة المرور"
+              placeholder="أدخل كلمة المرور الخاصة بك"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={true}
+              error={passwordError}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
 
-        <CustomButton
-          title="تسجيل الدخول الآمن"
-          onPress={handleLogin}
-          isLoading={isLoading}
-          color={theme.colors.primary}
-        />
-      </View>
-    </KeyboardAvoidingView>
+            <CustomButton
+              title="تسجيل الدخول الآمن"
+              onPress={handleLogin}
+              isLoading={isLoading}
+              color={theme.colors.primary}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -76,6 +91,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: theme.spacing.md,
