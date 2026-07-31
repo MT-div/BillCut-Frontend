@@ -4,6 +4,7 @@ import axios from "axios";
 import apiClient from "../api/apiClient";
 export const AuthContext = createContext();
 import { userMapper } from "../api/mappers/userMapper";
+import { registerForPushNotificationsAsync } from "../utils/notifications";
 
 //   : استبدل الرابط بـ IP حاسبك المحلي عند تجربة التطبيق على هاتف حقيقي متصل بنفس الشبكة
 export const BASE_URL = "http://10.0.2.2:8000";
@@ -13,7 +14,11 @@ export const AuthProvider = ({ children }) => {
   const [userToken, setUserToken] = useState(null);
   const [user, setUser] = useState(null);
   const [viewMode, setViewMode] = useState("admin"); // 'admin' أو 'resident'
-
+  useEffect(() => {
+    if (userToken) {
+      registerForPushNotificationsAsync();
+    }
+  }, [userToken]);
   useEffect(() => {
     loadStorageData();
   }, []);

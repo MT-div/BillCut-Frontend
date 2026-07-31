@@ -416,7 +416,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: theme.colors.errorText,
-    textAlign: "right",
     lineHeight: 16,
   },
   switcherContainer: {
