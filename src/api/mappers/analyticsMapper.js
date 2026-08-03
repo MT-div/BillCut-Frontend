@@ -3,6 +3,9 @@
  * يقوم بتجهيز مصفوفات الرسوم البيانية وتجهيز النصوص وعناوين المحاور
  * لضمان عدم انهيار مكتبة react-native-chart-kit عند وجود بيانات فارغة.
  */
+/**
+ * AnalyticsMapper (DTO Transformer / Chart ViewModel Builder)
+ */
 export const analyticsMapper = {
   toViewModel: (raw) => {
     if (!raw) return null;
@@ -36,31 +39,24 @@ export const analyticsMapper = {
       .map((item) => (item.date ? item.date.split("-")[2] : ""))
       .join("، ");
 
-    // 4. معالجة التنبؤ الشهري والدورة
-    const p1 = parseFloat(raw.currentCycleForecast?.predictedMonth1KWh) || 0;
-    const p2 = parseFloat(raw.currentCycleForecast?.predictedMonth2KWh) || 0;
-    const totalPredictedCycleKWh = roundToTwo(p1 + p2);
+    // 4. معالجة التنبؤ الشهري وإجمالي الدورة التكيّفي الموحد بحزام أمان حامي من NaN
+    const totalCycleKWh =
+      parseFloat(raw.currentCycleForecast?.totalCycleConsumptionKWh) || 0;
     const expectedBillSYP =
       parseInt(raw.currentCycleForecast?.expectedBillSYP) || 0;
 
     return {
       meterId: raw.meterId || "",
-
-      // مصفوفات المخطط السنوي الجاهزة للرسم مباشرة
       monthlyChart: {
         labels: monthlyLabels.length > 0 ? monthlyLabels : ["لا توجد بيانات"],
         values: monthlyValues.length > 0 ? monthlyValues : [0],
       },
-
-      // مصفوفات المخطط اليومي الجاهزة للرسم مباشرة
       dailyChart: {
         labels: dailyLabels.length > 0 ? dailyLabels : ["لا توجد بيانات"],
         actualValues: dailyActual.length > 0 ? dailyActual : [0],
         predictedValues: dailyPredicted.length > 0 ? dailyPredicted : [0],
       },
-
-      // التنبؤات والتحذيرات
-      totalPredictedCycleKWh,
+      totalPredictedCycleKWh: roundToTwo(totalCycleKWh),
       expectedBillSYP,
       hasAnomaly,
       anomalyDatesString,
