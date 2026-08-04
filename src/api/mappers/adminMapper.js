@@ -1,8 +1,12 @@
 /**
  * AdminMapper (Master DTO Transformer for Admin Operations)
- * يتولى تنقية وتسوية بيانات الإحصائيات، المستخدمين، العدادات، والتعرفات
- * القادمة من APIs الإدارة قبل وصولها للواجهات.
  */
+
+function roundToTwo(num) {
+  if (isNaN(num) || num === null || num === undefined) return 0.0;
+  return +(Math.round(num + "e+2") + "e-2");
+}
+
 export const adminMapper = {
   // 1. تنقية كائن الإحصائيات
   toStatsViewModel: (raw) => {
@@ -13,7 +17,48 @@ export const adminMapper = {
     };
   },
 
-  // 2. تنقية مصفوفة حسابات المشتركين
+  // 2. تنقية وتجهيز كائن العتبة التكيّفية ورسم المقارنة البصرية (مُصلح)
+  toThresholdViewModel: (raw) => {
+    if (!raw || !raw.activeThreshold) {
+      return {
+        targetRegionName: "المنطقة المحلية / سوريا",
+        baseMeanKWh: 10.25,
+        baseThresholdKWh: 7.0,
+        targetRegionMeanKWh: 23.16,
+        calculatedThresholdKWh: 15.8,
+        systemCalculatedMeanKWh: 23.16,
+        proposedSystemThresholdKWh: 15.8,
+        chartImageUri: null,
+      };
+    }
+
+    const t = raw.activeThreshold;
+    const baseMean = parseFloat(t.baseMeanKWh) || 10.25;
+    const baseThreshold = parseFloat(t.baseThresholdKWh) || 7.0;
+    const activeThreshold = parseFloat(t.calculatedThresholdKWh) || 15.8;
+    const systemMean = parseFloat(raw.systemCalculatedMeanKWh) || 23.16;
+
+    // استخدام الحساب النظيف والمضمون
+    const proposedThreshold = roundToTwo(
+      baseThreshold * (systemMean / baseMean)
+    );
+
+    return {
+      thresholdId: t.thresholdId,
+      targetRegionName: t.targetRegionName || "المنطقة المحلية / سوريا",
+      baseMeanKWh: baseMean,
+      baseThresholdKWh: baseThreshold,
+      targetRegionMeanKWh: parseFloat(t.targetRegionMeanKWh) || systemMean,
+      calculatedThresholdKWh: activeThreshold,
+      systemCalculatedMeanKWh: systemMean,
+      proposedSystemThresholdKWh: proposedThreshold,
+      chartImageUri: raw.chartBase64
+        ? `data:image/png;base64,${raw.chartBase64}`
+        : null,
+    };
+  },
+
+  // 3. تنقية مصفوفة حسابات المشتركين
   toUserListViewModel: (rawList) => {
     if (!Array.isArray(rawList)) return [];
     return rawList.map((u) => ({
@@ -26,7 +71,7 @@ export const adminMapper = {
     }));
   },
 
-  // 3. تنقية مصفوفة العدادات الفيزيائية
+  // 4. تنقية مصفوفة العدادات الفيزيائية
   toMeterListViewModel: (rawList) => {
     if (!Array.isArray(rawList)) return [];
     return rawList.map((m) => ({
@@ -38,7 +83,7 @@ export const adminMapper = {
     }));
   },
 
-  // 4. تنقية مصفوفة إصدارات التعرفة
+  // 5. تنقية مصفوفة إصدارات التعرفة
   toTariffListViewModel: (rawList) => {
     if (!Array.isArray(rawList)) return [];
     return rawList.map((t) => ({
