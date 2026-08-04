@@ -6,8 +6,10 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Dimensions,
   Image,
 } from "react-native";
+import { BarChart } from "react-native-chart-kit";
 
 import CustomCard from "../../components/CustomCard";
 import CustomButton from "../../components/CustomButton";
@@ -17,6 +19,9 @@ import CustomAlert from "../../components/CustomAlert";
 import { AuthContext } from "../../context/AuthContext";
 import { useAdminHome } from "../../hooks/admin/useAdminHome";
 import { theme } from "../../theme/theme";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const CARD_INNER_WIDTH = SCREEN_WIDTH - 64;
 
 export default function AdminHomeScreen() {
   const { user, logout, toggleViewMode } = useContext(AuthContext);
@@ -34,6 +39,19 @@ export default function AdminHomeScreen() {
     thresholdErrorMsg,
     handleUpdateThreshold,
   } = useAdminHome();
+
+  const barChartConfig = {
+    backgroundColor: theme.colors.surface,
+    backgroundGradientFrom: theme.colors.surface,
+    backgroundGradientTo: theme.colors.surface,
+    decimalPlaces: 0,
+    color: (opacity = 1) => `rgba(27, 79, 114, ${opacity})`,
+    labelColor: (opacity = 1) => `rgba(87, 101, 116, ${opacity})`,
+    barPercentage: 0.45,
+    style: {
+      borderRadius: 12,
+    },
+  };
 
   if (isLoading && !isRefreshing) {
     return (
@@ -74,7 +92,31 @@ export default function AdminHomeScreen() {
         </CustomCard>
       </View>
 
-      {/* 3. كارت الرسم البياني الكبير المرتفع لكثافة الأخطاء */}
+      {/* 3. كارت إجمالي الاستهلاك الشهري لكافة المشتركين (System-Wide Monthly Consumption) */}
+      <CustomCard style={styles.systemMonthlyCard}>
+        <Text style={styles.cardTitle}>
+          إجمالي الاستهلاك الشهري العام لكافة المشتركين (آخر 12 شهراً)
+        </Text>
+        <Text style={styles.subLabel}>
+          تجميع سحابي ومباشر لكافة قراءات العدادات المسجلة في المنظومة (kWh):
+        </Text>
+
+        <BarChart
+          data={{
+            labels: stats?.systemMonthlyChart?.labels || ["لا توجد بيانات"],
+            datasets: [{ data: stats?.systemMonthlyChart?.values || [0] }],
+          }}
+          width={CARD_INNER_WIDTH}
+          height={210}
+          yAxisSuffix=" k"
+          chartConfig={barChartConfig}
+          verticalLabelRotation={0}
+          fromZero
+          style={styles.chartStyle}
+        />
+      </CustomCard>
+
+      {/* 4. كارت الرسم البياني المرتفع لكثافة الأخطاء */}
       {thresholdData?.chartImageUri && (
         <CustomCard style={styles.largeChartCard}>
           <Text style={styles.chartMainTitle}>
@@ -90,7 +132,7 @@ export default function AdminHomeScreen() {
         </CustomCard>
       )}
 
-      {/* 4. كارت حوكمة ومعايرة العتبات المنسق والمريح للعين */}
+      {/* 5. كارت حوكمة ومعايرة العتبات المنسق */}
       <CustomCard style={styles.thresholdCard}>
         <View style={styles.cardHeaderRow}>
           <Text style={styles.cardTitle}>معايرة وتكيّف العتبة الإقليمية</Text>
@@ -104,7 +146,6 @@ export default function AdminHomeScreen() {
           على متوسط النظام:
         </Text>
 
-        {/* الجدول/القائمة المنسقة للمعلومات المرجعية والفعالة */}
         <View style={styles.infoDetailsTable}>
           <View style={styles.infoDetailRow}>
             <Text style={styles.infoDetailLabel}>العتبة الفعّالة الحالية:</Text>
@@ -172,7 +213,6 @@ export default function AdminHomeScreen() {
         <CustomAlert type="error" message={thresholdErrorMsg} />
         <CustomAlert type="success" message={thresholdSuccessMsg} />
       </CustomCard>
-
       {/* 1. كارت الترحيب وزر التبديل */}
       <CustomCard style={styles.welcomeCard}>
         <Text style={styles.welcomeTitle}>
@@ -229,7 +269,7 @@ const styles = StyleSheet.create({
     color: theme.colors.primary,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "bold",
     color: theme.colors.text,
   },
@@ -267,7 +307,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: theme.colors.text,
   },
+  systemMonthlyCard: {
+    marginBottom: theme.spacing.md,
+  },
   largeChartCard: {
+    marginBottom: theme.spacing.md,
     padding: theme.spacing.sm,
   },
   largeChartWrapper: {
@@ -280,6 +324,11 @@ const styles = StyleSheet.create({
   largeDensityImage: {
     width: "100%",
     height: "100%",
+  },
+  chartStyle: {
+    marginVertical: theme.spacing.xs,
+    borderRadius: 8,
+    alignSelf: "center",
   },
   thresholdCard: {
     borderWidth: 1,

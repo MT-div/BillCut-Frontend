@@ -9,14 +9,35 @@ function roundToTwo(num) {
 
 export const adminMapper = {
   // 1. تنقية كائن الإحصائيات
+  // 1. تنقية كائن الإحصائيات وإعداد مخطط الاستهلاك الموحد لكافة المشتركين
   toStatsViewModel: (raw) => {
-    if (!raw) return { usersCount: 0, metersCount: 0 };
+    if (!raw)
+      return {
+        usersCount: 0,
+        metersCount: 0,
+        systemMonthlyChart: { labels: [], values: [] },
+      };
+
+    const rawMonthly = Array.isArray(raw.systemMonthlyHistory)
+      ? raw.systemMonthlyHistory
+      : [];
+    const monthlyLabels = rawMonthly.map((item) => {
+      const parts = (item.monthName || "").split(" ");
+      return parts[0] ? parts[0].substring(0, 3) : "";
+    });
+    const monthlyValues = rawMonthly.map(
+      (item) => parseFloat(item.consumptionKWh) || 0
+    );
+
     return {
       usersCount: parseInt(raw.usersCount) || 0,
       metersCount: parseInt(raw.metersCount) || 0,
+      systemMonthlyChart: {
+        labels: monthlyLabels.length > 0 ? monthlyLabels : ["لا توجد بيانات"],
+        values: monthlyValues.length > 0 ? monthlyValues : [0],
+      },
     };
   },
-
   // 2. تنقية وتجهيز كائن العتبة التكيّفية ورسم المقارنة البصرية (مُصلح)
   toThresholdViewModel: (raw) => {
     if (!raw || !raw.activeThreshold) {
