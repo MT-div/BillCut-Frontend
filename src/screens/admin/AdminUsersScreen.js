@@ -1,4 +1,6 @@
-import React, { useCallback } from "react";
+import React, { useContext, useCallback } from "react";
+import { AuthContext } from "../../context/AuthContext";
+
 import {
   View,
   Text,
@@ -10,6 +12,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Keyboard,
+  ScrollView,
 } from "react-native";
 
 import CustomCard from "../../components/CustomCard";
@@ -22,6 +25,19 @@ import { useAdminUsers } from "../../hooks/admin/useAdminUsers";
 import { theme } from "../../theme/theme";
 
 export default function AdminUsersScreen() {
+  const { user: currentUser } = useContext(AuthContext); // المستخدم الحالي المسجل الدخول
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN"; // فحص هل هو SUPER_ADMIN
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.colors.primary} />
+        <Text style={styles.footerText}>
+          جاري تحميل المزيد من المستخدمين...
+        </Text>
+      </View>
+    );
+  };
   const {
     filteredUsers,
     isLoading,
@@ -61,78 +77,133 @@ export default function AdminUsersScreen() {
     setUserToDelete,
     isDeleting,
     handleDeleteUser,
+
+    roleFilter,
+    handleRoleFilterChange,
+    isRoleModalVisible,
+    setIsRoleModalVisible,
+    userToChangeRole,
+    setUserToChangeRole,
+    selectedNewRole,
+    setSelectedNewRole,
+    isChangingRole,
+    roleErrorMsg,
+    handleChangeRoleSubmit,
   } = useAdminUsers();
 
-  const renderUserItem = useCallback(({ item }) => {
-    return (
-      <CustomCard style={styles.userCard}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.userName}>{item.fullName}</Text>
-          <Text style={styles.userRoleTag}>مشترك منزلي</Text>
-        </View>
-        <Text style={styles.userDetailText}>
-          رقم الهاتف: {item.phoneNumber}
-        </Text>
-        <Text style={styles.userDetailText}>اسم الحساب: {item.username}</Text>
+  const renderUserItem = useCallback(
+    ({ item }) => {
+      return (
+        <CustomCard style={styles.userCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.userName}>{item.fullName}</Text>
 
-        <View style={styles.actionsRow}>
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              { backgroundColor: theme.colors.primary },
-            ]}
-            onPress={() => {
-              setSelectedUser(item);
-              setEditFullName(item.fullName);
-              setEditPhone(item.phoneNumber);
-              setIsEditVisible(true);
-            }}
-          >
-            <Text style={styles.actionBtnText}>تعديل البيانات</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              { backgroundColor: theme.colors.errorText },
-            ]}
-            onPress={() => {
-              setUserToDelete(item);
-              setIsDeleteVisible(true);
-            }}
-          >
-            <Text style={styles.actionBtnText}>حذف الحساب</Text>
-          </TouchableOpacity>
-        </View>
-      </CustomCard>
-    );
-  }, []);
+            {/* إظهار شارة الدور فقط وحصراً إذا كان المستعرض هو SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <View
+                style={[
+                  styles.roleBadge,
+                  {
+                    backgroundColor:
+                      item.role === "SUPER_ADMIN"
+                        ? "#E8F8F5"
+                        : item.role === "ADMIN"
+                        ? "#FEF9E7"
+                        : "#EBF5FB",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.roleBadgeText,
+                    {
+                      color:
+                        item.role === "SUPER_ADMIN"
+                          ? theme.colors.successText
+                          : item.role === "ADMIN"
+                          ? theme.colors.secondary
+                          : theme.colors.primary,
+                    },
+                  ]}
+                >
+                  {item.role === "SUPER_ADMIN"
+                    ? "مدير سيادي 👑"
+                    : item.role === "ADMIN"
+                    ? "مشرف أجهزة 🛠️"
+                    : "مشترك منزلي 🏠"}
+                </Text>
+              </View>
+            )}
+          </View>
 
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-    return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color={theme.colors.primary} />
-        <Text style={styles.footerText}>جاري تحميل المزيد من المشتركين...</Text>
-      </View>
-    );
-  };
+          <Text style={styles.userDetailText}>
+            رقم الهاتف: {item.phoneNumber}
+          </Text>
+          <Text style={styles.userDetailText}>اسم الحساب: {item.username}</Text>
 
-  if (isLoading && !isRefreshing) {
-    return (
-      <View style={styles.loadingCenter}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>
-          جاري استيراد الحسابات وتفاصيل المشتركين...
-        </Text>
-      </View>
-    );
-  }
+          <View style={styles.actionsRow}>
+            {/* إظهار زر تغيير الصلاحيات فقط وحصراً للـ SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  { backgroundColor: theme.colors.secondary, width: "31%" },
+                ]}
+                onPress={() => {
+                  setUserToChangeRole(item);
+                  setSelectedNewRole(item.role);
+                  setIsRoleModalVisible(true);
+                }}
+              >
+                <Text style={styles.actionBtnText}>تغيير الدور</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                {
+                  backgroundColor: theme.colors.primary,
+                  width: isSuperAdmin ? "31%" : "48%",
+                },
+              ]}
+              onPress={() => {
+                setSelectedUser(item);
+                setEditFullName(item.fullName);
+                setEditPhone(item.phoneNumber);
+                setIsEditVisible(true);
+              }}
+            >
+              <Text style={styles.actionBtnText}>تعديل البيانات</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                {
+                  backgroundColor: theme.colors.errorText,
+                  width: isSuperAdmin ? "31%" : "48%",
+                },
+              ]}
+              onPress={() => {
+                setUserToDelete(item);
+                setIsDeleteVisible(true);
+              }}
+            >
+              <Text style={styles.actionBtnText}>حذف الحساب</Text>
+            </TouchableOpacity>
+          </View>
+        </CustomCard>
+      );
+    },
+    [isSuperAdmin]
+  );
 
   return (
     <View style={styles.container}>
       <AlertBanner type="error" message={error} />
 
-      {/* 1. مربع البحث السريع والزر الموجه والمحمي أفقياً بجانبه */}
+      {/* مربع البحث وأزرار الفلترة */}
       <View style={styles.headerBox}>
         <View style={styles.searchRow}>
           <View style={styles.searchInputContainer}>
@@ -140,9 +211,6 @@ export default function AdminUsersScreen() {
               placeholder="ابحث بالاسم أو رقم الهاتف..."
               value={searchQuery}
               onChangeText={setSearchQuery}
-              keyboardType="default"
-              autoCapitalize="none"
-              autoCorrect={false}
             />
           </View>
           <TouchableOpacity
@@ -164,13 +232,52 @@ export default function AdminUsersScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* أزرار الفلترة بالأدوار تظهر فقط وحصراً للـ SUPER_ADMIN */}
+        {isSuperAdmin && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 8 }}
+          >
+            {[
+              { label: "جميع الحسابات", value: "" },
+              { label: "المشتركين 🏠", value: "RESIDENT" },
+              { label: "المشرفين 🛠️", value: "ADMIN" },
+              { label: "المدراء السياديين 👑", value: "SUPER_ADMIN" },
+            ].map((chip) => {
+              const isSelected = roleFilter === chip.value;
+              return (
+                <TouchableOpacity
+                  key={chip.label}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : "#E2E8F0",
+                    },
+                  ]}
+                  onPress={() => handleRoleFilterChange(chip.value)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: isSelected ? "#FFFFFF" : theme.colors.text },
+                    ]}
+                  >
+                    {chip.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
         <View style={{ height: theme.spacing.sm }} />
         <CustomButton
           title="➕ إنشاء حساب مشترك جديد"
-          onPress={() => {
-            setCreatedTempPassword("");
-            setIsCreateVisible(true);
-          }}
+          onPress={() => setIsCreateVisible(true)}
           color={theme.colors.secondary}
         />
       </View>
@@ -408,6 +515,88 @@ export default function AdminUsersScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ==================== Modal تغيير الدور الخاص بالـ SUPER_ADMIN ==================== */}
+      <Modal
+        visible={isRoleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsRoleModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>تغيير صلاحيات ودور الحساب</Text>
+            <Text style={styles.subLabel}>
+              المستهدف: {userToChangeRole?.fullName} (
+              {userToChangeRole?.phoneNumber})
+            </Text>
+
+            <CustomAlert type="error" message={roleErrorMsg} />
+
+            <Text style={styles.pickerLabel}>اختر الصلاحية الجديدة:</Text>
+            {[
+              { label: "مستعمل منزلي عادي (RESIDENT)", value: "RESIDENT" },
+              { label: "مشرف أجهزة ومستعملين (ADMIN)", value: "ADMIN" },
+              { label: "مدير نظام سيادي (SUPER_ADMIN)", value: "SUPER_ADMIN" },
+            ].map((r) => {
+              const isSelected = selectedNewRole === r.value;
+              return (
+                <TouchableOpacity
+                  key={r.value}
+                  style={[
+                    styles.roleOptionBtn,
+                    {
+                      backgroundColor: isSelected
+                        ? theme.colors.primary
+                        : "#FAFAFA",
+                    },
+                  ]}
+                  onPress={() => setSelectedNewRole(r.value)}
+                >
+                  <Text
+                    style={[
+                      styles.roleOptionText,
+                      { color: isSelected ? "#FFFFFF" : theme.colors.text },
+                    ]}
+                  >
+                    {r.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.primary },
+                ]}
+                onPress={handleChangeRoleSubmit}
+                disabled={isChangingRole}
+              >
+                {isChangingRole ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalBtnText}>تأكيد التغيير</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalBtn,
+                  { backgroundColor: theme.colors.border },
+                ]}
+                onPress={() => setIsRoleModalVisible(false)}
+              >
+                <Text
+                  style={[styles.modalBtnText, { color: theme.colors.text }]}
+                >
+                  إلغاء
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -623,5 +812,38 @@ const styles = StyleSheet.create({
     color: theme.colors.subtext,
     marginTop: 4,
     fontWeight: "600",
+  },
+  roleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  roleOptionBtn: {
+    width: "100%",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 8,
+  },
+  roleOptionText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "right",
+  },
+  filterChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 6,
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: "bold",
   },
 });

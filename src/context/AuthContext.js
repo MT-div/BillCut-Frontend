@@ -39,7 +39,11 @@ export const AuthProvider = ({ children }) => {
 
         setUserToken(access);
         setUser(userData);
-        setViewMode(userData.role === "ADMIN" ? "admin" : "resident");
+        setViewMode(
+          userData.role === "ADMIN" || userData.role === "SUPER_ADMIN"
+            ? "admin"
+            : "resident"
+        );
 
         // التخزين عبر أداة Storage التغليفية
         await Storage.setAccessToken(access);
@@ -82,14 +86,23 @@ export const AuthProvider = ({ children }) => {
       if (accessToken && parsedUser) {
         setUserToken(accessToken);
         setUser(parsedUser);
-        setViewMode(parsedUser.role === "ADMIN" ? "admin" : "resident");
+        setViewMode(
+          parsedUser.role === "ADMIN" || parsedUser.role === "SUPER_ADMIN"
+            ? "admin"
+            : "resident"
+        );
 
         try {
           const res = await apiClient.get("/api/auth/me/");
           if (res.data.status === "success") {
             const freshUserData = userMapper.toDomain(res.data.user);
             setUser(freshUserData);
-            setViewMode(freshUserData.role === "ADMIN" ? "admin" : "resident");
+            setViewMode(
+              freshUserData.role === "ADMIN" ||
+                freshUserData.role === "SUPER_ADMIN"
+                ? "admin"
+                : "resident"
+            );
             await Storage.setUserData(freshUserData);
           }
         } catch (syncErr) {

@@ -10,8 +10,6 @@ export function useAdminUsers() {
   const [error, setError] = useState("");
 
   // حالات البحث
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearching, setIsSearching] = useState(false);
 
   // الترقيم السحابي
   const [offset, setOffset] = useState(0);
@@ -38,16 +36,23 @@ export function useAdminUsers() {
   const [isDeleteVisible, setIsDeleteVisible] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  // أ. حالات البحث والفلترة حسب الدور
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState(""); // "" أو "RESIDENT" أو "ADMIN" أو "SUPER_ADMIN"
+  const [isSearching, setIsSearching] = useState(false);
 
-  // دالة الجلب والترقيم
+  // حالات نافذة تغيير الصلاحية والدور
+  const [isRoleModalVisible, setIsRoleModalVisible] = useState(false);
+  const [userToChangeRole, setUserToChangeRole] = useState(null);
+  const [selectedNewRole, setSelectedNewRole] = useState("RESIDENT");
+  const [isChangingRole, setIsChangingRole] = useState(false);
+  const [roleErrorMsg, setRoleErrorMsg] = useState("");
+
   const fetchUsers = useCallback(
-    async (isInitial = true, searchVal = searchQuery) => {
+    async (isInitial = true, searchVal = searchQuery, roleVal = roleFilter) => {
       if (isInitial) {
-        if (searchVal.trim()) {
-          setIsSearching(true);
-        } else {
-          setIsLoading(true);
-        }
+        if (searchVal.trim() || roleVal) setIsSearching(true);
+        else setIsLoading(true);
         setOffset(0);
         setHasMore(true);
       } else {
@@ -61,12 +66,12 @@ export function useAdminUsers() {
         const response = await apiClient.get("/api/admin/users/create/", {
           params: {
             search: searchVal.trim(),
+            role: roleVal || undefined,
             limit: limit,
             offset: currentOffset,
           },
         });
 
-        // تنقية وتنسيق مصفوفة النتائج عبر adminMapper
         const rawResults = response.data.results || [];
         const mappedResults = adminMapper.toUserListViewModel(rawResults);
         const totalCount = response.data.count || 0;
@@ -85,10 +90,7 @@ export function useAdminUsers() {
           setHasMore(users.length + mappedResults.length < totalCount);
         }
       } catch (err) {
-        const errMsg =
-          err.response?.data?.message ||
-          "تعذر جلب قائمة المستخدمين النشطين من السيرفر.";
-        setError(errMsg);
+        setError(err.response?.data?.message || "تعذر جلب قائمة المستخدمين.");
       } finally {
         setIsLoading(false);
         setIsRefreshing(false);
@@ -96,8 +98,37 @@ export function useAdminUsers() {
         setIsSearching(false);
       }
     },
-    [offset, users.length, searchQuery]
+    [offset, users.length, searchQuery, roleFilter]
   );
+
+  const handleRoleFilterChange = (newRole) => {
+    setRoleFilter(newRole);
+    fetchUsers(true, searchQuery, newRole);
+  };
+
+  // دالة تغيير دور المستخدم للـ SUPER_ADMIN
+  const handleChangeRoleSubmit = async () => {
+    if (!userToChangeRole) return;
+    setRoleErrorMsg("");
+    setIsChangingRole(true);
+
+    try {
+      const response = await apiClient.post("/api/admin/users/change_role/", {
+        userId: userToChangeRole.id,
+        newRole: selectedNewRole,
+      });
+
+      if (response.data.status === "success") {
+        setIsRoleModalVisible(false);
+        setUserToChangeRole(null);
+        fetchUsers(true, searchQuery, roleFilter); // تحديث فوري
+      }
+    } catch (err) {
+      setRoleErrorMsg(err.response?.data?.message || "تعذر تغيير الصلاحية.");
+    } finally {
+      setIsChangingRole(false);
+    }
+  };
 
   const onRefresh = useCallback(() => {
     setIsRefreshing(true);
@@ -232,5 +263,17 @@ export function useAdminUsers() {
     setUserToDelete,
     isDeleting,
     handleDeleteUser,
+
+    roleFilter,
+    handleRoleFilterChange,
+    isRoleModalVisible,
+    setIsRoleModalVisible,
+    userToChangeRole,
+    setUserToChangeRole,
+    selectedNewRole,
+    setSelectedNewRole,
+    isChangingRole,
+    roleErrorMsg,
+    handleChangeRoleSubmit,
   };
 }

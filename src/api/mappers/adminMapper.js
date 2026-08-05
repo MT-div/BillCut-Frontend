@@ -85,9 +85,9 @@ export const adminMapper = {
     return rawList.map((u) => ({
       id: u.id || 0,
       username: u.username || "",
-      fullName: u.fullName || "مشترك",
+      fullName: u.fullName || "مستخدم",
       phoneNumber: u.phoneNumber || "",
-      role: u.role || "RESIDENT",
+      role: u.role || "RESIDENT", // RESIDENT, ADMIN, SUPER_ADMIN
       createdAt: u.createdAt ? u.createdAt.substring(0, 10) : "",
     }));
   },

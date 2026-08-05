@@ -153,7 +153,8 @@ export const AppNavigator = () => {
     <NavigationContainer>
       {!userToken ? (
         <AuthNavigator />
-      ) : user?.role === "ADMIN" && viewMode === "admin" ? (
+      ) : (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") &&
+        viewMode === "admin" ? (
         <AdminTabNavigator /> // # حل المشكلة: توجيه الأدمن لـ الـ TabNavigator ليظهر البار العلوي والسفلي فورا!
       ) : (
         <ResidentTabNavigator />
