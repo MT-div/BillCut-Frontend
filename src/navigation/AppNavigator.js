@@ -23,6 +23,8 @@ import AdminHomeScreen from "../screens/admin/AdminHomeScreen";
 import AdminUsersScreen from "../screens/admin/AdminUsersScreen";
 import AdminMetersScreen from "../screens/admin/AdminMetersScreen";
 import LoginScreen from "../screens/LoginScreen";
+import SubscriptionRequestScreen from "../screens/SubscriptionRequestScreen";
+import AdminSubscriptionRequestsScreen from "../screens/admin/AdminSubscriptionRequestsScreen";
 // استيراد طبقة الأمان والهوية البصرية
 import { AuthContext } from "../context/AuthContext";
 import { theme } from "../theme/theme";
@@ -47,6 +49,10 @@ const Tab = createBottomTabNavigator();
 const AuthNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen
+      name="SubscriptionRequest"
+      component={SubscriptionRequestScreen}
+    />
   </Stack.Navigator>
 );
 
@@ -120,6 +126,11 @@ const AdminTabNavigator = () => (
       name="العدادات"
       component={AdminMetersScreen}
       options={{ title: "إدارة العدادات والأجهزة" }}
+    />
+    <Tab.Screen
+      name="طلبات الاشتراك"
+      component={AdminSubscriptionRequestsScreen}
+      options={{ title: "طلبات الاشتراك" }}
     />
     <Tab.Screen
       name="التعرفة والشرائح"

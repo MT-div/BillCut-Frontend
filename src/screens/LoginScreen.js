@@ -8,6 +8,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 
 import CustomInput from "../components/CustomInput";
@@ -17,7 +18,7 @@ import CustomAlert from "../components/CustomAlert";
 import { useLoginForm } from "../hooks/useLoginForm";
 import { theme } from "../theme/theme";
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const {
     username,
     setUsername,
@@ -80,6 +81,15 @@ export default function LoginScreen() {
               isLoading={isLoading}
               color={theme.colors.primary}
             />
+            {/* رابط تقديم طلب اشتراك للمواطنين الجدد */}
+            <TouchableOpacity
+              style={styles.registerLinkBtn}
+              onPress={() => navigation.navigate("SubscriptionRequest")}
+            >
+              <Text style={styles.registerLinkText}>
+                لست مشتركاً في الخدمة بعد؟ تقديم طلب اشتراك 📝
+              </Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -120,5 +130,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: theme.spacing.lg,
     fontWeight: "500",
+  },
+  registerLinkBtn: {
+    marginTop: theme.spacing.md,
+    alignSelf: "center",
+    paddingVertical: 4,
+  },
+  registerLinkText: {
+    fontSize: 12.5,
+    fontWeight: "bold",
+    color: theme.colors.primary,
+    textAlign: "center",
   },
 });
